@@ -53,7 +53,6 @@ export const candidatePatchSchema = z.object({
   portfolioUrl: optStr,
   linkedinUrl: optStr,
   referencesAvailable: optStr,
-  narrative: optStr,
   flexibility: z.number().min(1).max(10).optional(),
   extras: z.record(z.string(), z.string()).optional(),
 });
@@ -107,6 +106,7 @@ export const jobPatchSchema = z.object({
   contactName: optStr,
   contactPhone: optStr,
   narrative: optStr,
+  flexibility: z.number().min(1).max(10).optional(),
   extras: z.record(z.string(), z.string()).optional(),
 });
 

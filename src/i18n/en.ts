@@ -28,10 +28,18 @@ export const en = {
     demoEmployerHint: "No Google — quick testing",
     defaultEmployeeName: "New candidate",
     defaultEmployerName: "New employer",
+    realUsersTitle: "Sign in for real users",
+    iAmEmployee: "I am looking for work",
+    iAmEmployer: "I am hiring",
+    googleNotConfigured: "Google Auth is not configured on the server yet.",
+    afterSignInHint: "After signing in, choose employee or employer.",
+    demoEmployeeDev: "Employee demo (dev only)",
+    demoEmployerDev: "Employer demo (dev only)",
   },
   session: {
     noActiveSession: "No active session.",
     backToStart: "Back to start",
+    reconnect: "Sign in again",
   },
   employee: {
     subtitle: "Chat with the agent · Jobs approved for you",
@@ -204,6 +212,14 @@ export const en = {
       summary: "Job summary",
     },
   },
+  flexibility: {
+    title: "Match flexibility",
+    decrease: "Decrease flexibility",
+    increase: "Increase flexibility",
+    veryFlexible: "1 · very flexible",
+    exactOnly: "10 · exact only",
+    hint: "Change here or ask the agent in chat — it will update from your instruction or what it understands.",
+  },
   matching: {
     similarField: "Similar field ({candidate} ↔ {job})",
     roleMatch: "Role match",
@@ -213,3 +229,14 @@ export const en = {
     score: "Score {value}",
   },
 } as const;
+
+
+type DeepString<T> = {
+  [K in keyof T]: T[K] extends string
+    ? string
+    : T[K] extends Record<string, unknown>
+      ? DeepString<T[K]>
+      : T[K];
+};
+
+export type Messages = DeepString<typeof en>;

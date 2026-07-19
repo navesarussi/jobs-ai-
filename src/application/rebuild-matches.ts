@@ -1,4 +1,3 @@
-import { getMessages } from "@/i18n";
 import { randomUUID } from "crypto";
 import {
   applyFlexibility,
@@ -8,7 +7,6 @@ import {
 } from "@/domain/matching";
 import type { Match, StoreData } from "@/domain/types";
 
-/** Rebuild queued matches for all employer/candidate pairs. Keeps approved/rejected. */
 export function rebuildMatches(store: StoreData): Match[] {
   const kept = store.matches.filter((m) => m.status !== "queued");
   const keptKeys = new Set(kept.map((m) => `${m.jobOwnerId}:${m.candidateId}`));
@@ -30,12 +28,7 @@ export function rebuildMatches(store: StoreData): Match[] {
         jobOwnerId: employer.userId,
         candidateId: employee.userId,
         score,
-        reason: explainMatch(
-          employee.card,
-          employer.card,
-          score,
-          getMessages("en").matching,
-        ),
+        reason: explainMatch(employee.card, employer.card, score),
         status: "queued",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

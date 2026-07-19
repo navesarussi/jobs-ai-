@@ -7,19 +7,12 @@ import { allowDemo } from "@/infrastructure/auth-guard";
 import { readStore, writeStore } from "@/infrastructure/store";
 
 export async function GET() {
-  return ok({
-    googleAuth: hasGoogleAuth(),
-    allowDemo: allowDemoMode(),
-  });
+  return ok({ googleAuth: hasGoogleAuth(), allowDemo: allowDemoMode() });
 }
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as {
-      name?: string;
-      role?: Role;
-      demo?: boolean;
-    };
+    const body = (await req.json()) as { role?: Role; demo?: boolean; name?: string };
     const store = await readStore();
     const role = body.role === "employer" ? "employer" : "employee";
 
@@ -93,21 +86,13 @@ function ensureRoleRecords(store: StoreData, userId: string, role: Role): StoreD
       ...store,
       employees: [
         ...store.employees,
-        {
-          userId,
-          card: emptyCandidateCard(),
-          chat: [],
-          pendingFieldQuestionIds: [],
-        },
+        { userId, card: emptyCandidateCard(), chat: [], pendingFieldQuestionIds: [] },
       ],
     };
   }
   if (store.employers.some((e) => e.userId === userId)) return store;
   return {
     ...store,
-    employers: [
-      ...store.employers,
-      { userId, card: emptyJobCard(), chat: [] },
-    ],
+    employers: [...store.employers, { userId, card: emptyJobCard(), chat: [] }],
   };
 }

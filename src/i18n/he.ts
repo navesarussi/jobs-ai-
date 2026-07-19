@@ -30,10 +30,18 @@ export const he: Messages = {
     demoEmployerHint: "בלי Google — לבדיקה מהירה",
     defaultEmployeeName: "מועמד/ת חדש/ה",
     defaultEmployerName: "מעסיק/ה חדש/ה",
+    realUsersTitle: "כניסה ליוזרים אמיתיים",
+    iAmEmployee: "אני מחפש/ת עבודה",
+    iAmEmployer: "אני מגייס/ת",
+    googleNotConfigured: "Google Auth עדיין לא מוגדר בשרת.",
+    afterSignInHint: "אחרי התחברות בוחרים תפקיד — עובד או מעסיק.",
+    demoEmployeeDev: "דמו עובד/ת (פיתוח בלבד)",
+    demoEmployerDev: "דמו מעסיק/ה (פיתוח בלבד)",
   },
   session: {
     noActiveSession: "אין סשן פעיל.",
     backToStart: "חזרה להתחלה",
+    reconnect: "התחברות מחדש",
   },
   employee: {
     subtitle: "צ׳אט עם הסוכן · משרות שאושרו עבורך",
@@ -206,6 +214,14 @@ export const he: Messages = {
       narrative: "טקסט חופשי / סיפור על המשרה",
       summary: "סיכום משרה",
     },
+  },
+  flexibility: {
+    title: "גמישות התאמה",
+    decrease: "הפחת גמישות",
+    increase: "הגבר גמישות",
+    veryFlexible: "1 · גמיש מאוד",
+    exactOnly: "10 · רק מדויק",
+    hint: "אפשר לשנות כאן או לבקש מהסוכן בשיחה — הוא יעדכן לפי ההוראה או לפי מה שהוא מבין.",
   },
   matching: {
     similarField: "תחום דומה ({candidate} ↔ {job})",

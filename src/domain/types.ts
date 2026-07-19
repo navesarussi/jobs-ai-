@@ -114,6 +114,8 @@ export type JobCard = {
   contactPhone: string;
   /** Free-form narrative about the role / culture */
   narrative: string;
+  /** 1 = גמיש מאוד בדרישות, 10 = רק התאמה מדויקת */
+  flexibility: number;
   extras: Record<string, string>;
 };
 
@@ -285,6 +287,7 @@ export function emptyJobCard(): JobCard {
     contactName: "",
     contactPhone: "",
     narrative: "",
+    flexibility: 5,
     extras: {},
   };
 }

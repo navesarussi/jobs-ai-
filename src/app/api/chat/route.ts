@@ -14,7 +14,6 @@ export async function POST(req: Request) {
     if (!body.userId || !body.message?.trim() || !body.role) {
       return ok({ error: "חסרים פרטים" }, { status: 400 });
     }
-
     const gate = await assertActor(body.userId);
     if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 

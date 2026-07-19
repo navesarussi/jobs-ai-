@@ -20,19 +20,19 @@ export function formatCardValue(value: unknown): string {
   return String(value);
 }
 
-export function candidateRows(card: CandidateCard) {
+export function candidateRows(card: CandidateCard, labels: Record<string, string> = {}) {
   return CANDIDATE_FIELD_META.map((m) => ({
     key: m.key,
-    label: m.label,
+    label: labels[m.key] ?? m.key,
     value: formatCardValue(valueOf(card, m.key)),
     filled: !isEmpty(valueOf(card, m.key)),
   }));
 }
 
-export function jobRows(card: JobCard) {
+export function jobRows(card: JobCard, labels: Record<string, string> = {}) {
   return JOB_FIELD_META.map((m) => ({
     key: m.key,
-    label: m.label,
+    label: labels[m.key] ?? m.key,
     value: formatCardValue(valueOf(card, m.key)),
     filled: !isEmpty(valueOf(card, m.key)),
   }));
@@ -55,8 +55,13 @@ export function nextMissingCandidateField(card: CandidateCard) {
 export function nextMissingJobField(card: JobCard) {
   const sorted = [...JOB_FIELD_META].sort((a, b) => a.priority - b.priority);
   for (const m of sorted) {
-    if (m.key === "summary" || m.key === "narrative") continue;
+    if (m.key === "summary" || m.key === "flexibility" || m.key === "narrative") {
+      continue;
+    }
     if (isEmpty(valueOf(card, m.key))) return m;
+  }
+  if (card.flexibility === 5) {
+    return JOB_FIELD_META.find((m) => m.key === "flexibility")!;
   }
   return null;
 }

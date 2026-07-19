@@ -64,70 +64,35 @@ export default function HomePage() {
               מחובר/ת כ־{session.user.name ?? session.user.email}
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                disabled={!!busy}
-                onClick={() => void start("employee", false)}
-                className="rounded-xl bg-[var(--hero)] px-4 py-3 text-sm font-medium text-white"
-              >
+              <button type="button" disabled={!!busy} onClick={() => void start("employee", false)} className="rounded-xl bg-[var(--hero)] px-4 py-3 text-sm font-medium text-white">
                 אני מחפש/ת עבודה
               </button>
-              <button
-                type="button"
-                disabled={!!busy}
-                onClick={() => void start("employer", false)}
-                className="rounded-xl border border-[var(--stroke)] px-4 py-3 text-sm font-medium"
-              >
+              <button type="button" disabled={!!busy} onClick={() => void start("employer", false)} className="rounded-xl border border-[var(--stroke)] px-4 py-3 text-sm font-medium">
                 אני מגייס/ת
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => void signOut({ callbackUrl: "/" })}
-              className="text-xs text-[var(--muted)] underline-offset-2 hover:underline"
-            >
+            <button type="button" onClick={() => void signOut({ callbackUrl: "/" })} className="text-xs text-[var(--muted)] underline-offset-2 hover:underline">
               התנתקות
             </button>
           </div>
         ) : (
           <div className="mt-3 space-y-3">
-            <button
-              type="button"
-              disabled={!googleAuth || status === "loading"}
-              onClick={() => void signIn("google", { callbackUrl: "/" })}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--ink)] px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-            >
+            <button type="button" disabled={!googleAuth || status === "loading"} onClick={() => void signIn("google", { callbackUrl: "/" })} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--ink)] px-4 py-3 text-sm font-medium text-white disabled:opacity-50">
               כניסה עם Google
             </button>
-            {!googleAuth ? (
-              <p className="text-xs leading-5 text-[var(--muted)]">
-                Google Auth עדיין לא מוגדר בשרת.
-              </p>
-            ) : (
-              <p className="text-xs leading-5 text-[var(--muted)]">
-                אחרי התחברות בוחרים תפקיד — עובד או מעסיק.
-              </p>
-            )}
+            <p className="text-xs leading-5 text-[var(--muted)]">
+              {googleAuth ? "אחרי התחברות בוחרים תפקיד — עובד או מעסיק." : "Google Auth עדיין לא מוגדר בשרת."}
+            </p>
           </div>
         )}
       </section>
 
       {allowDemo ? (
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => void start("employee", true)}
-            disabled={!!busy}
-            className="rounded-2xl border border-dashed border-[var(--stroke)] p-4 text-start text-sm text-[var(--muted)]"
-          >
+          <button type="button" onClick={() => void start("employee", true)} disabled={!!busy} className="rounded-2xl border border-dashed border-[var(--stroke)] p-4 text-start text-sm text-[var(--muted)]">
             דמו עובד/ת (פיתוח בלבד)
           </button>
-          <button
-            type="button"
-            onClick={() => void start("employer", true)}
-            disabled={!!busy}
-            className="rounded-2xl border border-dashed border-[var(--stroke)] p-4 text-start text-sm text-[var(--muted)]"
-          >
+          <button type="button" onClick={() => void start("employer", true)} disabled={!!busy} className="rounded-2xl border border-dashed border-[var(--stroke)] p-4 text-start text-sm text-[var(--muted)]">
             דמו מעסיק/ה (פיתוח בלבד)
           </button>
         </div>

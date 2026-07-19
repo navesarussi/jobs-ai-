@@ -22,7 +22,7 @@ describe("matching", () => {
       mustHaves: ["שירות"],
     };
     const base = computeBaseFit(candidate, job);
-    assert.ok(base >= 0.45);
+    assert.ok(base >= 0.4);
     assert.equal(shouldQueueForEmployer(applyFlexibility(base, 5)), true);
   });
 

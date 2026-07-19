@@ -23,7 +23,6 @@ function textScore(a: string, b: string): number {
   return hits === 0 ? 0 : hits / Math.max(tokensA.length, tokensB.size);
 }
 
-/** Base fit 0–1 before flexibility. */
 export function computeBaseFit(candidate: CandidateCard, job: JobCard): number {
   const role = textScore(candidate.desiredRole, job.title);
   const field = textScore(candidate.field, job.field);
@@ -61,10 +60,6 @@ export function computeBaseFit(candidate: CandidateCard, job: JobCard): number {
   return Math.max(0, Math.min(1, raw));
 }
 
-/**
- * flexibility 10 = strict (needs high base), 1 = very flexible.
- * Returns adjusted score 0–1 for ranking.
- */
 export function applyFlexibility(baseFit: number, flexibility: number): number {
   const f = Math.max(1, Math.min(10, flexibility));
   const strictness = (f - 1) / 9;
@@ -74,38 +69,22 @@ export function applyFlexibility(baseFit: number, flexibility: number): number {
   return Math.min(1, baseFit + (1 - strictness) * 0.12);
 }
 
-export function explainMatch(
-  candidate: CandidateCard,
-  job: JobCard,
-  score: number,
-  messages: {
-    similarField: string;
-    roleMatch: string;
-    locationMatch: string;
-    skillsOverlap: string;
-    flexibility: string;
-    score: string;
-  },
-): string {
+export function explainMatch(candidate: CandidateCard, job: JobCard, score: number): string {
   const parts: string[] = [];
   if (textScore(candidate.field, job.field) > 0.4) {
-    parts.push(
-      messages.similarField
-        .replace("{candidate}", candidate.field || "?")
-        .replace("{job}", job.field || "?"),
-    );
+    parts.push(`תחום דומה (${candidate.field || "?"} ↔ ${job.field || "?"})`);
   }
   if (textScore(candidate.desiredRole, job.title) > 0.4) {
-    parts.push(messages.roleMatch);
+    parts.push("התאמת תפקיד");
   }
   if (textScore(candidate.location, job.location) > 0.4) {
-    parts.push(messages.locationMatch);
+    parts.push("מיקום מתאים");
   }
   if (overlap(candidate.skills, job.mustHaves) > 0) {
-    parts.push(messages.skillsOverlap);
+    parts.push("כישורים שחופפים לדרישות");
   }
-  parts.push(messages.flexibility.replace("{value}", String(candidate.flexibility)));
-  parts.push(messages.score.replace("{value}", (score * 100).toFixed(0)));
+  parts.push(`גמישות ${candidate.flexibility}/10`);
+  parts.push(`ציון ${(score * 100).toFixed(0)}`);
   return parts.join(" · ");
 }
 
