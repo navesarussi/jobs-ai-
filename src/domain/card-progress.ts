@@ -41,7 +41,9 @@ export function jobRows(card: JobCard) {
 export function nextMissingCandidateField(card: CandidateCard) {
   const sorted = [...CANDIDATE_FIELD_META].sort((a, b) => a.priority - b.priority);
   for (const m of sorted) {
-    if (m.key === "summary" || m.key === "flexibility") continue;
+    if (m.key === "summary" || m.key === "flexibility" || m.key === "narrative") {
+      continue;
+    }
     if (isEmpty(valueOf(card, m.key))) return m;
   }
   if (card.flexibility === 5) {
@@ -53,7 +55,7 @@ export function nextMissingCandidateField(card: CandidateCard) {
 export function nextMissingJobField(card: JobCard) {
   const sorted = [...JOB_FIELD_META].sort((a, b) => a.priority - b.priority);
   for (const m of sorted) {
-    if (m.key === "summary") continue;
+    if (m.key === "summary" || m.key === "narrative") continue;
     if (isEmpty(valueOf(card, m.key))) return m;
   }
   return null;

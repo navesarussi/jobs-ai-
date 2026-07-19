@@ -53,6 +53,7 @@ export const candidatePatchSchema = z.object({
   portfolioUrl: optStr,
   linkedinUrl: optStr,
   referencesAvailable: optStr,
+  narrative: optStr,
   flexibility: z.number().min(1).max(10).optional(),
   extras: z.record(z.string(), z.string()).optional(),
 });
@@ -105,6 +106,7 @@ export const jobPatchSchema = z.object({
   onboardingNotes: optStr,
   contactName: optStr,
   contactPhone: optStr,
+  narrative: optStr,
   extras: z.record(z.string(), z.string()).optional(),
 });
 
@@ -127,4 +129,8 @@ export function hasGoogleAuth(): boolean {
   return Boolean(
     process.env.AUTH_GOOGLE_ID?.trim() && process.env.AUTH_GOOGLE_SECRET?.trim(),
   );
+}
+
+export function allowDemoMode(): boolean {
+  return process.env.ALLOW_DEMO === "true";
 }

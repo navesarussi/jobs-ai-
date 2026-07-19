@@ -4,6 +4,7 @@ import {
   rejectMatch,
 } from "@/application/employer-actions";
 import { ok, fail } from "@/infrastructure/http";
+import { assertActor } from "@/infrastructure/auth-guard";
 import { readStore, writeStore } from "@/infrastructure/store";
 
 export async function POST(req: Request) {
@@ -18,6 +19,9 @@ export async function POST(req: Request) {
     if (!body.employerId || !body.matchId || !body.action) {
       return ok({ error: "חסרים פרטים" }, { status: 400 });
     }
+
+    const gate = await assertActor(body.employerId);
+    if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 
     let store = await readStore();
     if (body.action === "approve") {

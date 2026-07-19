@@ -9,12 +9,19 @@ export default function HomePage() {
   const { data: session, status } = useSession();
   const [busy, setBusy] = useState<string | null>(null);
   const [googleAuth, setGoogleAuth] = useState(false);
+  const [allowDemo, setAllowDemo] = useState(false);
 
   useEffect(() => {
     void fetch("/api/session")
       .then((r) => r.json())
-      .then((d) => setGoogleAuth(Boolean(d.googleAuth)))
-      .catch(() => setGoogleAuth(false));
+      .then((d) => {
+        setGoogleAuth(Boolean(d.googleAuth));
+        setAllowDemo(Boolean(d.allowDemo));
+      })
+      .catch(() => {
+        setGoogleAuth(false);
+        setAllowDemo(false);
+      });
   }, []);
 
   async function start(role: "employee" | "employer", demo: boolean) {
@@ -23,18 +30,13 @@ export default function HomePage() {
       const res = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role,
-          demo,
-          name:
-            demo
-              ? undefined
-              : role === "employee"
-                ? "מועמד/ת חדש/ה"
-                : "מעסיק/ה חדש/ה",
-        }),
+        body: JSON.stringify({ role, demo }),
       });
       const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
       const user = data.user;
       if (!user?.id) return;
       localStorage.setItem("shidukh_user", JSON.stringify(user));
@@ -51,12 +53,11 @@ export default function HomePage() {
         מוצאים עבודה בלי לחפש
       </h1>
       <p className="mt-4 max-w-xl text-base leading-7 text-[var(--muted)]">
-        מדברים עם סוכן בטקסט חופשי. הוא ממלא כרטיס מפורט (עשרות שדות), משדך,
-        ומציג לכל צד רק את מה שרלוונטי.
+        נכנסים עם Google, מדברים עם סוכן בטקסט חופשי — והמערכת משדכת.
       </p>
 
       <section className="mt-8 rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] p-5">
-        <h2 className="text-base font-semibold">כניסה עם Google</h2>
+        <h2 className="text-base font-semibold">כניסה ליוזרים אמיתיים</h2>
         {status === "authenticated" && session?.user ? (
           <div className="mt-3 space-y-3">
             <p className="text-sm text-[var(--muted)]">
@@ -69,7 +70,7 @@ export default function HomePage() {
                 onClick={() => void start("employee", false)}
                 className="rounded-xl bg-[var(--hero)] px-4 py-3 text-sm font-medium text-white"
               >
-                המשך כמחפש/ת עבודה
+                אני מחפש/ת עבודה
               </button>
               <button
                 type="button"
@@ -77,7 +78,7 @@ export default function HomePage() {
                 onClick={() => void start("employer", false)}
                 className="rounded-xl border border-[var(--stroke)] px-4 py-3 text-sm font-medium"
               >
-                המשך כמעסיק/ה
+                אני מגייס/ת
               </button>
             </div>
             <button
@@ -100,41 +101,37 @@ export default function HomePage() {
             </button>
             {!googleAuth ? (
               <p className="text-xs leading-5 text-[var(--muted)]">
-                כדי להפעיל: הוסיפו ל־`.env.local` את{" "}
-                <code>AUTH_GOOGLE_ID</code>, <code>AUTH_GOOGLE_SECRET</code> ו־
-                <code>AUTH_SECRET</code> (ראו README). בינתיים אפשר דמו למטה.
+                Google Auth עדיין לא מוגדר בשרת.
               </p>
-            ) : null}
+            ) : (
+              <p className="text-xs leading-5 text-[var(--muted)]">
+                אחרי התחברות בוחרים תפקיד — עובד או מעסיק.
+              </p>
+            )}
           </div>
         )}
       </section>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => void start("employee", true)}
-          disabled={!!busy}
-          className="rounded-2xl bg-[var(--hero)] p-5 text-start text-white"
-        >
-          <span className="block text-lg font-semibold">דמו עובד/ת</span>
-          <span className="mt-2 block text-sm text-white/80">
-            בלי Google — לבדיקה מהירה
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => void start("employer", true)}
-          disabled={!!busy}
-          className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] p-5 text-start"
-        >
-          <span className="block text-lg font-semibold text-[var(--ink)]">
-            דמו מעסיק/ה
-          </span>
-          <span className="mt-2 block text-sm text-[var(--muted)]">
-            בלי Google — לבדיקה מהירה
-          </span>
-        </button>
-      </div>
+      {allowDemo ? (
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => void start("employee", true)}
+            disabled={!!busy}
+            className="rounded-2xl border border-dashed border-[var(--stroke)] p-4 text-start text-sm text-[var(--muted)]"
+          >
+            דמו עובד/ת (פיתוח בלבד)
+          </button>
+          <button
+            type="button"
+            onClick={() => void start("employer", true)}
+            disabled={!!busy}
+            className="rounded-2xl border border-dashed border-[var(--stroke)] p-4 text-start text-sm text-[var(--muted)]"
+          >
+            דמו מעסיק/ה (פיתוח בלבד)
+          </button>
+        </div>
+      ) : null}
     </main>
   );
 }

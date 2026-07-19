@@ -57,6 +57,8 @@ export type CandidateCard = {
   portfolioUrl: string;
   linkedinUrl: string;
   referencesAvailable: string;
+  /** Free-form narrative / stories from conversation */
+  narrative: string;
   /** 1 = גמיש מאוד, 10 = חייב התאמה מדויקת */
   flexibility: number;
   extras: Record<string, string>;
@@ -110,6 +112,8 @@ export type JobCard = {
   onboardingNotes: string;
   contactName: string;
   contactPhone: string;
+  /** Free-form narrative about the role / culture */
+  narrative: string;
   extras: Record<string, string>;
 };
 
@@ -225,6 +229,7 @@ export function emptyCandidateCard(): CandidateCard {
     portfolioUrl: "",
     linkedinUrl: "",
     referencesAvailable: "",
+    narrative: "",
     flexibility: 5,
     extras: {},
   };
@@ -279,6 +284,7 @@ export function emptyJobCard(): JobCard {
     onboardingNotes: "",
     contactName: "",
     contactPhone: "",
+    narrative: "",
     extras: {},
   };
 }

@@ -9,8 +9,8 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "שידוך — POC",
-  description: "סוכן השמה שמשדך בלי חיפוש",
+  title: "Shidukh — POC",
+  description: "A placement agent that matches without search",
 };
 
 export default function RootLayout({
@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" dir="rtl" className={`${heebo.variable} h-full`}>
+    <html lang="en" dir="ltr" className={`${heebo.variable} h-full`} suppressHydrationWarning>
       <body className="min-h-full antialiased">
         <Providers>{children}</Providers>
       </body>

@@ -1,6 +1,6 @@
 "use client";
 
-import { candidateRows, filledCount, jobRows } from "@/domain/card-progress";
+import { candidateRows, jobRows } from "@/domain/card-progress";
 import type { CandidateCard, JobCard } from "@/domain/types";
 
 export function ProfileAside(props: {
@@ -15,7 +15,6 @@ export function ProfileAside(props: {
     props.kind === "employee"
       ? candidateRows(c as CandidateCard)
       : jobRows(c as JobCard);
-  const filled = filledCount(rows);
   const card = c as CandidateCard;
 
   return (
@@ -24,7 +23,7 @@ export function ProfileAside(props: {
         {props.kind === "employee" ? "הכרטיס שלך" : "כרטיס המשרה"}
       </h2>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        {filled}/{rows.length} שדות מולאו · השאר מוגדרים וממתינים למילוי
+        מתמלא אוטומטית מהשיחה · כולל טקסט חופשי
       </p>
 
       {props.kind === "employee" ? (

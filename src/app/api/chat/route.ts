@@ -1,5 +1,6 @@
 import { handleEmployeeChat, handleEmployerChat } from "@/application/chat";
 import { ok, fail } from "@/infrastructure/http";
+import { assertActor } from "@/infrastructure/auth-guard";
 import { readStore, writeStore } from "@/infrastructure/store";
 import { hasGeminiKey } from "@/infrastructure/ai/schemas";
 
@@ -13,6 +14,9 @@ export async function POST(req: Request) {
     if (!body.userId || !body.message?.trim() || !body.role) {
       return ok({ error: "חסרים פרטים" }, { status: 400 });
     }
+
+    const gate = await assertActor(body.userId);
+    if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 
     const store = await readStore();
     const result =

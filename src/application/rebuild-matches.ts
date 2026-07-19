@@ -1,3 +1,4 @@
+import { getMessages } from "@/i18n";
 import { randomUUID } from "crypto";
 import {
   applyFlexibility,
@@ -29,7 +30,12 @@ export function rebuildMatches(store: StoreData): Match[] {
         jobOwnerId: employer.userId,
         candidateId: employee.userId,
         score,
-        reason: explainMatch(employee.card, employer.card, score),
+        reason: explainMatch(
+          employee.card,
+          employer.card,
+          score,
+          getMessages("en").matching,
+        ),
         status: "queued",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

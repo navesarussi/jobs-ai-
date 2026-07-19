@@ -1,4 +1,5 @@
 import { ok, fail } from "@/infrastructure/http";
+import { assertActor } from "@/infrastructure/auth-guard";
 import { readStore } from "@/infrastructure/store";
 import { hasGeminiKey } from "@/infrastructure/ai/schemas";
 
@@ -6,6 +7,9 @@ export async function GET(req: Request) {
   try {
     const userId = new URL(req.url).searchParams.get("userId");
     if (!userId) return ok({ error: "חסר userId" }, { status: 400 });
+
+    const gate = await assertActor(userId);
+    if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 
     const store = await readStore();
     const user = store.users.find((u) => u.id === userId);
