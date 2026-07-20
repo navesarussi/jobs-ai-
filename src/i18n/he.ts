@@ -69,6 +69,7 @@ export const he: Messages = {
     roleEmployer: "מעסיק/ה",
     roleClear: "לשאול בכל כניסה למסך הראשי",
     adminPortal: "פורטל מנהלים",
+    signOut: "התנתקות",
   },
   legal: {
     privacyTitle: "מדיניות פרטיות",

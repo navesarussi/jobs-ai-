@@ -7,12 +7,14 @@ import { useTranslation } from "@/components/LocaleProvider";
 import type { Locale } from "@/i18n/types";
 import type { Role } from "@/domain/types";
 import {
+  clearStoredUser,
   getOrCreateDeviceId,
   readRoleDefault,
   roleHomePath,
   writeRoleDefault,
   writeStoredUser,
 } from "@/lib/client-session";
+import { signOut } from "next-auth/react";
 
 export function SettingsMenu() {
   const { t, locale, setLocale } = useTranslation();
@@ -100,6 +102,18 @@ export function SettingsMenu() {
     window.location.href = `mailto:navesarussi@gmail.com?subject=${subject}&body=${body}`;
     setRateOpen(false);
     setOpen(false);
+  }
+
+  async function handleSignOut() {
+    setOpen(false);
+    clearStoredUser();
+    try {
+      await signOut({ redirect: false });
+    } catch {
+      // Open-auth / no Google session — local clear is enough.
+    }
+    router.push("/");
+    router.refresh();
   }
 
   return (
@@ -205,6 +219,15 @@ export function SettingsMenu() {
             }}
           >
             {t.settings.rate}
+          </button>
+          <div className="my-1 h-px bg-[var(--stroke)]" />
+          <button
+            type="button"
+            role="menuitem"
+            className={`${itemClass(false)} text-[var(--warn)]`}
+            onClick={() => void handleSignOut()}
+          >
+            {t.settings.signOut}
           </button>
         </div>
       ) : null}

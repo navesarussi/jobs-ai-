@@ -50,7 +50,7 @@ Match employers and candidates **without search**. Agents extract rich profiles 
 ### FR-UI
 | ID | Requirement |
 |---|---|
-| FR-UI-01 | Global settings control (top corner): language, privacy, terms, report a problem, rate the app, about, admin portal (when allowed), default role switch |
+| FR-UI-01 | Global settings control (top corner): language, privacy, terms, report a problem, rate the app, about, admin portal (when allowed), default role switch, **sign out** |
 | FR-UI-02 | Starting as employee/employer must succeed without opaque server errors |
 | FR-UI-03 | App entry and admin portal must not hang indefinitely on loading |
 | FR-UI-04 | Remember default role (employee/employer); home auto-opens that role’s screen (chat + jobs / chat + candidates) |

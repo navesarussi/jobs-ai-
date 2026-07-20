@@ -25,6 +25,11 @@ export function writeStoredUser(user: { id: string; name: string; role: Role }):
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
 }
 
+export function clearStoredUser(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(USER_STORAGE_KEY);
+}
+
 export function readRoleDefault(): Role | null {
   if (typeof window === "undefined") return null;
   const v = localStorage.getItem(ROLE_DEFAULT_KEY);

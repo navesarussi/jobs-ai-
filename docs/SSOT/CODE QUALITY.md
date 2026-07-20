@@ -24,3 +24,4 @@ Architecture: Domain ← Application ← Infrastructure / App.
 - Chat persistence: `chat_messages.conversation_context` (`employee`|`employer`) + optional `job_id` — never key chats by `owner_user_id` alone
 - Schema bootstrap: additive `ALTER`s (incl. `conversation_context`) run after `CREATE TABLE IF NOT EXISTS`; context index lives in ALTERS so existing DBs migrate without failing on missing columns
 - [PENDING REFACTOR]: split `SettingsMenu.tsx` / `application/chat.ts` under 200-line cap
+- Settings sign-out clears `shidukh_user` + NextAuth session (when present) and returns to `/`

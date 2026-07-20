@@ -67,6 +67,7 @@ export const en = {
     roleEmployer: "Employer",
     roleClear: "Ask each time on home",
     adminPortal: "Admin portal",
+    signOut: "Sign out",
   },
   legal: {
     privacyTitle: "Privacy policy",
