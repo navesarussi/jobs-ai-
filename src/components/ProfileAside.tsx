@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import { FlexibilitySlider } from "@/components/FlexibilitySlider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { candidateRows, jobRows, knowledgePercent } from "@/domain/card-progress";
-import type { CandidateCard, JobCard } from "@/domain/types";
+import {
+  emptyCandidateCard,
+  emptyJobCard,
+  type CandidateCard,
+  type JobCard,
+} from "@/domain/types";
 
 export function ProfileAside(props: {
   kind: "employee" | "employer";
@@ -24,13 +29,13 @@ export function ProfileAside(props: {
       .catch(() => setIsAdmin(false));
   }, []);
 
-  const c = props.card;
+  const c =
+    props.card ??
+    (props.kind === "employee" ? emptyCandidateCard() : emptyJobCard());
+
   useEffect(() => {
-    if (!c) return;
     setFlex(clampFlex((c as CandidateCard | JobCard).flexibility));
   }, [c]);
-
-  if (!c) return null;
 
   const labels = (props.kind === "employee"
     ? t.cardFields.candidate

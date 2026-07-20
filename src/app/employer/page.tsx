@@ -197,32 +197,26 @@ export default function EmployerPage() {
 
       {tab === "chat" ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-          <ChatPanel
-            key={`${userId}-${activeJobId ?? "job"}-employer`}
-            userId={userId}
-            role="employer"
-            locale={locale}
-            jobId={activeJobId ?? undefined}
-            initialMessages={me?.chat ?? []}
-            placeholder={t.employer.chatPlaceholder}
-            onTurn={onTurn}
-          />
-          <div className="relative space-y-4">
+          <div className="order-2 lg:order-1">
+            <ChatPanel
+              key={`${userId}-${activeJobId ?? "job"}-employer`}
+              userId={userId}
+              role="employer"
+              locale={locale}
+              jobId={activeJobId ?? undefined}
+              initialMessages={me?.chat ?? []}
+              placeholder={t.employer.chatPlaceholder}
+              onTurn={onTurn}
+            />
+          </div>
+          <div className="relative order-1 space-y-4 lg:order-2">
             {hydrating && !me ? (
               <p className="mb-2 text-xs text-[var(--muted)] opacity-70">…</p>
             ) : null}
-            <FileImport
-              userId={userId}
-              endpoint="/api/job-import"
-              jobId={activeJobId ?? undefined}
-              title={t.fileImport.jobTitle}
-              hint={t.fileImport.jobHint}
-              onDone={() => void refresh(userId, activeJobId)}
-            />
             <ProfileAside
               kind="employer"
               userId={userId}
-              card={(me?.card as never) ?? ({} as never)}
+              card={(me?.card as never) ?? null}
               onFlexibilityChange={(value) => {
                 setMe((prev) =>
                   prev
@@ -233,6 +227,14 @@ export default function EmployerPage() {
                     : prev,
                 );
               }}
+            />
+            <FileImport
+              userId={userId}
+              endpoint="/api/job-import"
+              jobId={activeJobId ?? undefined}
+              title={t.fileImport.jobTitle}
+              hint={t.fileImport.jobHint}
+              onDone={() => void refresh(userId, activeJobId)}
             />
           </div>
         </div>

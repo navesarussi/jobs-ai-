@@ -118,23 +118,18 @@ export default function EmployeePage() {
 
       {tab === "chat" ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-          <ChatPanel
-            key={`${userId}-employee`}
-            userId={userId}
-            role="employee"
-            locale={locale}
-            initialMessages={me?.chat ?? []}
-            placeholder={t.employee.chatPlaceholder}
-            onTurn={onTurn}
-          />
-          <div className="space-y-4">
-            <FileImport
+          <div className="order-2 lg:order-1">
+            <ChatPanel
+              key={`${userId}-employee`}
               userId={userId}
-              endpoint="/api/cv"
-              title={t.fileImport.cvTitle}
-              hint={t.fileImport.cvHint}
-              onDone={() => void refresh(userId)}
+              role="employee"
+              locale={locale}
+              initialMessages={me?.chat ?? []}
+              placeholder={t.employee.chatPlaceholder}
+              onTurn={onTurn}
             />
+          </div>
+          <div className="order-1 space-y-4 lg:order-2">
             <ProfileAside
               kind="employee"
               userId={userId}
@@ -150,6 +145,13 @@ export default function EmployeePage() {
                     : prev,
                 );
               }}
+            />
+            <FileImport
+              userId={userId}
+              endpoint="/api/cv"
+              title={t.fileImport.cvTitle}
+              hint={t.fileImport.cvHint}
+              onDone={() => void refresh(userId)}
             />
           </div>
         </div>

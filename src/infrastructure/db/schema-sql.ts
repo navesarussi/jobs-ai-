@@ -39,7 +39,7 @@ create table if not exists chat_messages (
   created_at timestamptz not null default now()
 );
 create index if not exists chat_messages_owner_idx on chat_messages (owner_user_id, created_at);
-create index if not exists chat_messages_context_idx on chat_messages (owner_user_id, conversation_context, job_id, created_at);
+-- Context index is created in schema.ts ALTERS (after conversation_context column exists)
 
 create table if not exists field_questions (
   id text primary key,

@@ -27,16 +27,23 @@ where m.owner_user_id = p.user_id
   and m.conversation_context is null
   and not exists (select 1 from employee_profiles e where e.user_id = m.owner_user_id);
 
-delete from chat_messages where conversation_context is null;
+update chat_messages set conversation_context = 'employee' where conversation_context is null;
 
 alter table chat_messages alter column conversation_context set default 'employee';
 alter table chat_messages alter column conversation_context set not null;
+
+create index if not exists chat_messages_context_idx
+  on chat_messages (owner_user_id, conversation_context, job_id, created_at);
 `;
 
 let schemaReady: Promise<void> | undefined;
 
 async function runSchema(): Promise<void> {
   const pool = await getPool();
+  // 1) CREATE TABLE IF NOT EXISTS (existing DBs keep old column set)
+  // 2) ALTER ADD COLUMN + backfill + indexes that need those columns
+  // Never put indexes on new columns inside NORMALIZED_SCHEMA_SQL — they run
+  // before ALTERs and break production when the table already exists.
   await pool.query(NORMALIZED_SCHEMA_SQL);
   await pool.query(ALTERS);
   await pool.query(
