@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ChatPanel, type ChatTurnPayload } from "@/components/ChatPanel";
+import { FileImport } from "@/components/FileImport";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "@/components/LocaleProvider";
 import { OpportunityList } from "@/components/OpportunityList";
@@ -126,22 +127,31 @@ export default function EmployeePage() {
             placeholder={t.employee.chatPlaceholder}
             onTurn={onTurn}
           />
-          <ProfileAside
-            kind="employee"
-            userId={userId}
-            card={(me?.card as never) ?? null}
-            pendingQuestions={me?.pendingQuestions ?? []}
-            onFlexibilityChange={(value) => {
-              setMe((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      card: { ...(prev.card as object), flexibility: value },
-                    }
-                  : prev,
-              );
-            }}
-          />
+          <div className="space-y-4">
+            <FileImport
+              userId={userId}
+              endpoint="/api/cv"
+              title={t.fileImport.cvTitle}
+              hint={t.fileImport.cvHint}
+              onDone={() => void refresh(userId)}
+            />
+            <ProfileAside
+              kind="employee"
+              userId={userId}
+              card={(me?.card as never) ?? null}
+              pendingQuestions={me?.pendingQuestions ?? []}
+              onFlexibilityChange={(value) => {
+                setMe((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        card: { ...(prev.card as object), flexibility: value },
+                      }
+                    : prev,
+                );
+              }}
+            />
+          </div>
         </div>
       ) : (
         <OpportunityList jobs={jobs} />

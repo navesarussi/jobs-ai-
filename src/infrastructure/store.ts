@@ -1,5 +1,9 @@
-import type { StoreData } from "@/domain/types";
-import { readNormalizedStore, writeNormalizedStore } from "./db/normalized-store";
+import type { Match, StoreData } from "@/domain/types";
+import {
+  readNormalizedStore,
+  replaceMatches,
+  writeNormalizedStore,
+} from "./db/normalized-store";
 
 export async function readStore(): Promise<StoreData> {
   return readNormalizedStore();
@@ -7,6 +11,11 @@ export async function readStore(): Promise<StoreData> {
 
 export async function writeStore(store: StoreData): Promise<void> {
   await writeNormalizedStore(store);
+}
+
+/** Persist only the matches table (targeted write for the deferred refresh). */
+export async function writeMatches(matches: Match[]): Promise<void> {
+  await replaceMatches(matches);
 }
 
 export async function updateStore(

@@ -111,6 +111,16 @@ export const en = {
     reset: "Reset chat",
     resetConfirm: "Clear this conversation?",
   },
+  fileImport: {
+    choose: "Upload a file",
+    processing: "Reading…",
+    done: "Added to your card",
+    error: "Could not read the file",
+    cvTitle: "Upload CV",
+    cvHint: "PDF, DOCX or TXT — the agent reads it and fills your card.",
+    jobTitle: "Upload job description",
+    jobHint: "PDF, DOCX or TXT — the agent reads it and fills the job card.",
+  },
   profile: {
     yourCard: "Your profile",
     jobCard: "Job profile",

@@ -113,6 +113,16 @@ export const he: Messages = {
     reset: "איפוס צ׳אט",
     resetConfirm: "לנקות את השיחה הזו?",
   },
+  fileImport: {
+    choose: "העלאת קובץ",
+    processing: "קורא…",
+    done: "נוסף לכרטיס שלך",
+    error: "לא הצלחתי לקרוא את הקובץ",
+    cvTitle: "העלאת קורות חיים",
+    cvHint: "PDF, DOCX או TXT — הסוכן קורא וממלא את הכרטיס.",
+    jobTitle: "העלאת תיאור משרה",
+    jobHint: "PDF, DOCX או TXT — הסוכן קורא וממלא את כרטיס המשרה.",
+  },
   profile: {
     yourCard: "הפרופיל שלך",
     jobCard: "פרופיל המשרה",

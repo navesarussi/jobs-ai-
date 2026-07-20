@@ -210,6 +210,67 @@ export async function handleEmployerChat(
   };
 }
 
+/** Apply a CV extraction to the candidate card and capture the raw text in the narrative. */
+export function applyCvExtraction(
+  store: StoreData,
+  userId: string,
+  patch: CandidatePatch,
+  sourceText: string,
+): { store: StoreData; card: CandidateCard } {
+  const emp = store.employees.find((e) => e.userId === userId);
+  if (!emp) throw new NotFoundError("Employee");
+
+  const patched = applyCandidatePatch(emp.card, patch);
+  const snippet = sourceText.trim().slice(0, 3000);
+  const narrative = [patched.narrative, snippet ? `קורות חיים שהועלו:\n${snippet}` : ""]
+    .filter(Boolean)
+    .join("\n\n");
+  const card: CandidateCard = { ...patched, narrative };
+
+  return {
+    store: {
+      ...store,
+      employees: store.employees.map((e) => (e.userId === userId ? { ...e, card } : e)),
+    },
+    card,
+  };
+}
+
+/** Apply a job-description extraction to the active job slot's card. */
+export function applyJobDescriptionExtraction(
+  store: StoreData,
+  userId: string,
+  patch: JobPatch,
+  sourceText: string,
+  jobId?: string,
+): { store: StoreData; card: JobCard; jobId: string } {
+  const raw = store.employers.find((e) => e.userId === userId);
+  if (!raw) throw new NotFoundError("Employer");
+
+  let employer = normalizeEmployerRecord(raw);
+  if (jobId) employer = withActiveJob(employer, jobId);
+  const active = getActiveJob(employer);
+
+  const patched = applyJobPatch(active.card, patch);
+  const snippet = sourceText.trim().slice(0, 3000);
+  const narrative = [patched.narrative, snippet ? `תיאור משרה שהועלה:\n${snippet}` : ""]
+    .filter(Boolean)
+    .join("\n\n");
+  const card: JobCard = { ...patched, narrative };
+
+  const updated = updateJobSlot(employer, active.id, { card });
+  const mirrored = withActiveJob(updated, active.id);
+
+  return {
+    store: {
+      ...store,
+      employers: store.employers.map((e) => (e.userId === userId ? mirrored : e)),
+    },
+    card,
+    jobId: active.id,
+  };
+}
+
 export function resetChat(
   store: StoreData,
   userId: string,

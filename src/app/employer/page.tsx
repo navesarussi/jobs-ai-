@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CandidateQueue } from "@/components/CandidateQueue";
 import { ChatPanel, type ChatTurnPayload } from "@/components/ChatPanel";
+import { FileImport } from "@/components/FileImport";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "@/components/LocaleProvider";
 import { ProfileAside } from "@/components/ProfileAside";
@@ -206,10 +207,18 @@ export default function EmployerPage() {
             placeholder={t.employer.chatPlaceholder}
             onTurn={onTurn}
           />
-          <div className="relative">
+          <div className="relative space-y-4">
             {hydrating && !me ? (
               <p className="mb-2 text-xs text-[var(--muted)] opacity-70">…</p>
             ) : null}
+            <FileImport
+              userId={userId}
+              endpoint="/api/job-import"
+              jobId={activeJobId ?? undefined}
+              title={t.fileImport.jobTitle}
+              hint={t.fileImport.jobHint}
+              onDone={() => void refresh(userId, activeJobId)}
+            />
             <ProfileAside
               kind="employer"
               userId={userId}

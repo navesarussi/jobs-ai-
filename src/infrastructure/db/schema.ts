@@ -33,7 +33,9 @@ alter table chat_messages alter column conversation_context set default 'employe
 alter table chat_messages alter column conversation_context set not null;
 `;
 
-export async function ensureSchema(): Promise<void> {
+let schemaReady: Promise<void> | undefined;
+
+async function runSchema(): Promise<void> {
   const pool = await getPool();
   await pool.query(NORMALIZED_SCHEMA_SQL);
   await pool.query(ALTERS);
@@ -41,6 +43,21 @@ export async function ensureSchema(): Promise<void> {
     `insert into schema_migrations (version) values ($1) on conflict (version) do nothing`,
     [MIGRATION_VERSION],
   );
+}
+
+/**
+ * Run the schema DDL + migrations exactly once per process. Previously this ran
+ * on every read and write — including a table-wide `update matches` — adding
+ * several round-trips (and a write) to every single request.
+ */
+export function ensureSchema(): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = runSchema().catch((err) => {
+      schemaReady = undefined; // allow a retry on the next call if bootstrap failed
+      throw err;
+    });
+  }
+  return schemaReady;
 }
 
 export async function hasNormalizedData(): Promise<boolean> {

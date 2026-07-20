@@ -24,3 +24,29 @@ export async function registerFieldQuestionDefinition(
     [randomUUID(), fieldKey, question.question],
   );
 }
+
+/** Batch-register field definitions in a single statement (deduped by field_key). */
+export async function registerFieldQuestionDefinitions(
+  client: PoolClient,
+  questions: FieldQuestion[],
+): Promise<void> {
+  if (questions.length === 0) return;
+  const byKey = new Map<string, string>();
+  for (const q of questions) {
+    const fieldKey = `fq_${slugKey(q.question) || q.id.slice(0, 8)}`;
+    byKey.set(fieldKey, q.question); // last write wins; dedupes conflicting rows in one insert
+  }
+  const params: unknown[] = [];
+  const tuples: string[] = [];
+  for (const [fieldKey, label] of byKey) {
+    params.push(randomUUID(), fieldKey, label);
+    const n = params.length;
+    tuples.push(`($${n - 2}, 'candidate', $${n - 1}, $${n}, 'employer', 200)`);
+  }
+  await client.query(
+    `insert into card_field_definitions (id, card_type, field_key, label_he, source, priority)
+     values ${tuples.join(",")}
+     on conflict (card_type, field_key) do update set label_he = excluded.label_he`,
+    params,
+  );
+}

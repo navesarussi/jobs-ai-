@@ -3,7 +3,7 @@ import { handleEmployeeChat, handleEmployerChat } from "@/application/chat";
 import { refreshStoreMatches } from "@/application/employer-actions";
 import { ok, fail } from "@/infrastructure/http";
 import { assertActor } from "@/infrastructure/auth-guard";
-import { writeStore, updateStore } from "@/infrastructure/store";
+import { writeStore, writeMatches } from "@/infrastructure/store";
 import { hasGeminiKey } from "@/infrastructure/ai/schemas";
 
 export async function POST(req: Request) {
@@ -41,7 +41,9 @@ export async function POST(req: Request) {
 
     after(async () => {
       try {
-        await updateStore((latest) => refreshStoreMatches(latest));
+        // Recompute matches from the just-written state (no extra full read),
+        // and persist only the matches table.
+        await writeMatches(refreshStoreMatches(result.store).matches);
       } catch (err) {
         console.error("deferred match refresh failed", err);
       }

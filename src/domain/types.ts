@@ -195,7 +195,12 @@ export type AdminSettings = {
   promptBundleVersion?: string;
 };
 
-export type AiUsageType = "employee_intake" | "employer_intake" | "enrich_reason";
+export type AiUsageType =
+  | "employee_intake"
+  | "employer_intake"
+  | "enrich_reason"
+  | "cv_import"
+  | "job_import";
 
 export type AiUsageRecord = {
   id: string;

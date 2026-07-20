@@ -1,5 +1,5 @@
-import type { PoolClient } from "pg";
-import type { Role, StoreData, User } from "@/domain/types";
+import type { Pool, PoolClient } from "pg";
+import type { Match, Role, StoreData, User } from "@/domain/types";
 import {
   emptyCandidateCard,
   emptyJobCard,
@@ -8,7 +8,7 @@ import {
 import { normalizeEmployerRecord } from "@/domain/employer-jobs";
 import { applyChatRowsToStore, chatRowsFromStore } from "./chat-messages";
 import { ensureSchema, hasNormalizedData } from "./schema";
-import { registerFieldQuestionDefinition } from "./field-definitions";
+import { registerFieldQuestionDefinitions } from "./field-definitions";
 import { getPool } from "./pool";
 
 function normalizeStore(raw: StoreData): StoreData {
@@ -33,6 +33,51 @@ function normalizeStore(raw: StoreData): StoreData {
   };
 }
 
+/**
+ * One multi-row INSERT (chunked) instead of a query per row. `casts[i]` adds a
+ * type cast to the i-th column's placeholder (e.g. "jsonb" for JSON payloads).
+ */
+async function bulkInsert(
+  client: PoolClient,
+  table: string,
+  columns: string[],
+  casts: (string | null)[],
+  rows: unknown[][],
+  conflict = "",
+): Promise<void> {
+  if (rows.length === 0) return;
+  const CHUNK = 500;
+  for (let start = 0; start < rows.length; start += CHUNK) {
+    const chunk = rows.slice(start, start + CHUNK);
+    const params: unknown[] = [];
+    const tuples = chunk.map((row) => {
+      const placeholders = row.map((value, idx) => {
+        params.push(value);
+        const cast = casts[idx];
+        return cast ? `$${params.length}::${cast}` : `$${params.length}`;
+      });
+      return `(${placeholders.join(",")})`;
+    });
+    await client.query(
+      `insert into ${table} (${columns.join(",")}) values ${tuples.join(",")} ${conflict}`,
+      params,
+    );
+  }
+}
+
+async function deleteNotIn(
+  client: PoolClient,
+  table: string,
+  idColumn: string,
+  ids: string[],
+): Promise<void> {
+  if (ids.length) {
+    await client.query(`delete from ${table} where not (${idColumn} = any($1::text[]))`, [ids]);
+  } else {
+    await client.query(`delete from ${table}`);
+  }
+}
+
 async function readLegacyBlob(): Promise<StoreData | null> {
   const pool = await getPool();
   const result = await pool.query<{ data: StoreData }>(
@@ -42,18 +87,19 @@ async function readLegacyBlob(): Promise<StoreData | null> {
   return normalizeStore(result.rows[0].data);
 }
 
-async function loadFromTables(client: PoolClient): Promise<StoreData> {
+async function loadFromTables(pool: Pool): Promise<StoreData> {
+  // Separate pooled clients → the reads actually run concurrently.
   const [users, employees, employers, chats, questions, answers, matches, admin, usage] =
     await Promise.all([
-      client.query(`select * from app_users order by created_at`),
-      client.query(`select * from employee_profiles`),
-      client.query(`select * from employer_profiles`),
-      client.query(`select * from chat_messages order by created_at`),
-      client.query(`select * from field_questions order by created_at`),
-      client.query(`select * from field_answers`),
-      client.query(`select * from matches order by created_at`),
-      client.query(`select * from admin_settings where id = 'main' limit 1`),
-      client.query(`select * from ai_usage order by created_at`),
+      pool.query(`select * from app_users order by created_at`),
+      pool.query(`select * from employee_profiles`),
+      pool.query(`select * from employer_profiles`),
+      pool.query(`select * from chat_messages order by created_at`),
+      pool.query(`select * from field_questions order by created_at`),
+      pool.query(`select * from field_answers`),
+      pool.query(`select * from matches order by created_at`),
+      pool.query(`select * from admin_settings where id = 'main' limit 1`),
+      pool.query(`select * from ai_usage order by created_at`),
     ]);
 
   const baseStore = normalizeStore({
@@ -152,133 +198,145 @@ async function upsertUser(client: PoolClient, user: User): Promise<void> {
   );
 }
 
+const MATCH_COLUMNS = [
+  "id",
+  "job_owner_id",
+  "job_id",
+  "candidate_id",
+  "score",
+  "reason",
+  "status",
+  "created_at",
+  "updated_at",
+];
+
+function matchRow(m: Match): unknown[] {
+  return [
+    m.id,
+    m.jobOwnerId,
+    m.jobId || m.jobOwnerId,
+    m.candidateId,
+    m.score,
+    m.reason,
+    m.status,
+    m.createdAt,
+    m.updatedAt,
+  ];
+}
+
 async function persistStore(client: PoolClient, store: StoreData): Promise<void> {
   const normalized = normalizeStore(store);
-  const userIds = normalized.users.map((u) => u.id);
-  const employeeIds = normalized.employees.map((e) => e.userId);
-  const employerIds = normalized.employers.map((e) => e.userId);
-  const questionIds = normalized.fieldQuestions.map((q) => q.id);
-  const matchIds = normalized.matches.map((m) => m.id);
-  const usageIds = (normalized.aiUsage ?? []).map((u) => u.id);
+  const now = new Date().toISOString();
 
-  for (const user of normalized.users) await upsertUser(client, user);
-  if (userIds.length) {
-    await client.query(`delete from app_users where not (id = any($1::text[]))`, [userIds]);
-  } else {
-    await client.query(`delete from app_users`);
-  }
+  await bulkInsert(
+    client,
+    "app_users",
+    ["id", "name", "role", "email", "image", "google_id", "created_at"],
+    [null, null, null, null, null, null, null],
+    normalized.users.map((u) => [
+      u.id,
+      u.name,
+      u.role,
+      u.email ?? null,
+      u.image ?? null,
+      u.googleId ?? null,
+      u.createdAt,
+    ]),
+    `on conflict (id) do update set
+       name = excluded.name, role = excluded.role, email = excluded.email,
+       image = excluded.image, google_id = excluded.google_id`,
+  );
+  await deleteNotIn(client, "app_users", "id", normalized.users.map((u) => u.id));
 
-  for (const emp of normalized.employees) {
-    await client.query(
-      `insert into employee_profiles (user_id, card, pending_field_question_ids, updated_at)
-       values ($1, $2::jsonb, $3::jsonb, now())
-       on conflict (user_id) do update set
-         card = excluded.card,
-         pending_field_question_ids = excluded.pending_field_question_ids,
-         updated_at = now()`,
-      [emp.userId, JSON.stringify(emp.card), JSON.stringify(emp.pendingFieldQuestionIds)],
-    );
-  }
-  if (employeeIds.length) {
-    await client.query(
-      `delete from employee_profiles where not (user_id = any($1::text[]))`,
-      [employeeIds],
-    );
-  } else {
-    await client.query(`delete from employee_profiles`);
-  }
+  await bulkInsert(
+    client,
+    "employee_profiles",
+    ["user_id", "card", "pending_field_question_ids", "updated_at"],
+    [null, "jsonb", "jsonb", null],
+    normalized.employees.map((e) => [
+      e.userId,
+      JSON.stringify(e.card),
+      JSON.stringify(e.pendingFieldQuestionIds),
+      now,
+    ]),
+    `on conflict (user_id) do update set
+       card = excluded.card,
+       pending_field_question_ids = excluded.pending_field_question_ids,
+       updated_at = excluded.updated_at`,
+  );
+  await deleteNotIn(client, "employee_profiles", "user_id", normalized.employees.map((e) => e.userId));
 
-  for (const er of normalized.employers) {
-    const employer = normalizeEmployerRecord(er);
-    await client.query(
-      `insert into employer_profiles (user_id, card, jobs, active_job_id, updated_at)
-       values ($1, $2::jsonb, $3::jsonb, $4, now())
-       on conflict (user_id) do update set
-         card = excluded.card,
-         jobs = excluded.jobs,
-         active_job_id = excluded.active_job_id,
-         updated_at = now()`,
-      [
-        employer.userId,
-        JSON.stringify(employer.card),
-        JSON.stringify(employer.jobs),
-        employer.activeJobId,
-      ],
-    );
-  }
-  if (employerIds.length) {
-    await client.query(
-      `delete from employer_profiles where not (user_id = any($1::text[]))`,
-      [employerIds],
-    );
-  } else {
-    await client.query(`delete from employer_profiles`);
-  }
+  const employers = normalized.employers.map((er) => normalizeEmployerRecord(er));
+  await bulkInsert(
+    client,
+    "employer_profiles",
+    ["user_id", "card", "jobs", "active_job_id", "updated_at"],
+    [null, "jsonb", "jsonb", null, null],
+    employers.map((e) => [
+      e.userId,
+      JSON.stringify(e.card),
+      JSON.stringify(e.jobs),
+      e.activeJobId,
+      now,
+    ]),
+    `on conflict (user_id) do update set
+       card = excluded.card, jobs = excluded.jobs,
+       active_job_id = excluded.active_job_id, updated_at = excluded.updated_at`,
+  );
+  await deleteNotIn(client, "employer_profiles", "user_id", employers.map((e) => e.userId));
 
-  // Replace chats in one pass (avoids dual-role wipe races).
+  // Chat messages (candidate + employer per-job, with conversation context).
   await client.query(`delete from chat_messages`);
-  for (const row of chatRowsFromStore(normalized)) {
-    await client.query(
-      `insert into chat_messages (
-         id, owner_user_id, conversation_context, job_id, role, content, created_at
-       )
-       values ($1, $2, $3, $4, $5, $6, $7)
-       on conflict (id) do update set
-         owner_user_id = excluded.owner_user_id,
-         conversation_context = excluded.conversation_context,
-         job_id = excluded.job_id,
-         role = excluded.role,
-         content = excluded.content`,
-      [
-        row.id,
-        row.ownerUserId,
-        row.conversationContext,
-        row.jobId,
-        row.role,
-        row.content,
-        row.createdAt,
-      ],
-    );
-  }
+  await bulkInsert(
+    client,
+    "chat_messages",
+    ["id", "owner_user_id", "conversation_context", "job_id", "role", "content", "created_at"],
+    [null, null, null, null, null, null, null],
+    chatRowsFromStore(normalized).map((r) => [
+      r.id,
+      r.ownerUserId,
+      r.conversationContext,
+      r.jobId,
+      r.role,
+      r.content,
+      r.createdAt,
+    ]),
+    `on conflict (id) do nothing`,
+  );
 
   await client.query(`delete from field_answers`);
   await client.query(`delete from field_questions`);
-  for (const q of normalized.fieldQuestions) {
-    await client.query(
-      `insert into field_questions (id, field, question, source_job_id, source_employer_id, created_at)
-       values ($1, $2, $3, $4, $5, $6)`,
-      [q.id, q.field, q.question, q.sourceJobId, q.sourceEmployerId, q.createdAt],
-    );
-    await registerFieldQuestionDefinition(client, q);
-  }
-  for (const a of normalized.fieldAnswers) {
-    await client.query(
-      `insert into field_answers (question_id, candidate_id, answer, answered_at)
-       values ($1, $2, $3, $4)`,
-      [a.questionId, a.candidateId, a.answer, a.answeredAt],
-    );
-  }
-  void questionIds;
+  await bulkInsert(
+    client,
+    "field_questions",
+    ["id", "field", "question", "source_job_id", "source_employer_id", "created_at"],
+    [null, null, null, null, null, null],
+    normalized.fieldQuestions.map((q) => [
+      q.id,
+      q.field,
+      q.question,
+      q.sourceJobId,
+      q.sourceEmployerId,
+      q.createdAt,
+    ]),
+  );
+  await bulkInsert(
+    client,
+    "field_answers",
+    ["question_id", "candidate_id", "answer", "answered_at"],
+    [null, null, null, null],
+    normalized.fieldAnswers.map((a) => [a.questionId, a.candidateId, a.answer, a.answeredAt]),
+  );
+  await registerFieldQuestionDefinitions(client, normalized.fieldQuestions);
 
   await client.query(`delete from matches`);
-  for (const m of normalized.matches) {
-    await client.query(
-      `insert into matches (id, job_owner_id, job_id, candidate_id, score, reason, status, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        m.id,
-        m.jobOwnerId,
-        m.jobId || m.jobOwnerId,
-        m.candidateId,
-        m.score,
-        m.reason,
-        m.status,
-        m.createdAt,
-        m.updatedAt,
-      ],
-    );
-  }
-  void matchIds;
+  await bulkInsert(
+    client,
+    "matches",
+    MATCH_COLUMNS,
+    MATCH_COLUMNS.map(() => null),
+    normalized.matches.map(matchRow),
+  );
 
   await client.query(`delete from admin_settings`);
   if (normalized.adminSettings) {
@@ -295,14 +353,21 @@ async function persistStore(client: PoolClient, store: StoreData): Promise<void>
   }
 
   await client.query(`delete from ai_usage`);
-  for (const u of normalized.aiUsage ?? []) {
-    await client.query(
-      `insert into ai_usage (id, type, prompt_tokens, completion_tokens, total_tokens, estimated_cost_usd, created_at)
-       values ($1, $2, $3, $4, $5, $6, $7)`,
-      [u.id, u.type, u.promptTokens, u.completionTokens, u.totalTokens, u.estimatedCostUsd, u.createdAt],
-    );
-  }
-  void usageIds;
+  await bulkInsert(
+    client,
+    "ai_usage",
+    ["id", "type", "prompt_tokens", "completion_tokens", "total_tokens", "estimated_cost_usd", "created_at"],
+    [null, null, null, null, null, null, null],
+    (normalized.aiUsage ?? []).map((u) => [
+      u.id,
+      u.type,
+      u.promptTokens,
+      u.completionTokens,
+      u.totalTokens,
+      u.estimatedCostUsd,
+      u.createdAt,
+    ]),
+  );
 }
 
 function seedStore(): StoreData {
@@ -410,10 +475,11 @@ export async function findUserByEmailOrGoogle(
 export async function readNormalizedStore(): Promise<StoreData> {
   await ensureSchema();
   const pool = await getPool();
-  const client = await pool.connect();
-  let began = false;
-  try {
-    if (!(await hasNormalizedData())) {
+
+  if (!(await hasNormalizedData())) {
+    const client = await pool.connect();
+    let began = false;
+    try {
       const legacy = await readLegacyBlob();
       const seed = legacy ?? seedStore();
       await client.query("begin");
@@ -422,14 +488,15 @@ export async function readNormalizedStore(): Promise<StoreData> {
       await client.query("commit");
       began = false;
       return seed;
+    } catch (e) {
+      if (began) await client.query("rollback");
+      throw e;
+    } finally {
+      client.release();
     }
-    return await loadFromTables(client);
-  } catch (e) {
-    if (began) await client.query("rollback");
-    throw e;
-  } finally {
-    client.release();
   }
+
+  return loadFromTables(pool);
 }
 
 export async function writeNormalizedStore(store: StoreData): Promise<void> {
@@ -441,6 +508,33 @@ export async function writeNormalizedStore(store: StoreData): Promise<void> {
     await client.query("begin");
     began = true;
     await persistStore(client, store);
+    await client.query("commit");
+    began = false;
+  } catch (e) {
+    if (began) await client.query("rollback");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/** Replace just the matches table — used by the deferred, off-critical-path refresh. */
+export async function replaceMatches(matches: Match[]): Promise<void> {
+  await ensureSchema();
+  const pool = await getPool();
+  const client = await pool.connect();
+  let began = false;
+  try {
+    await client.query("begin");
+    began = true;
+    await client.query(`delete from matches`);
+    await bulkInsert(
+      client,
+      "matches",
+      MATCH_COLUMNS,
+      MATCH_COLUMNS.map(() => null),
+      matches.map(matchRow),
+    );
     await client.query("commit");
     began = false;
   } catch (e) {
