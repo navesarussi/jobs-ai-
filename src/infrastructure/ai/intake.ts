@@ -1,4 +1,4 @@
-import { generateObject, generateText } from "ai";
+import { generateObject, generateText, streamText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import type { CandidateCard, ChatMessage, FieldQuestion, JobCard } from "@/domain/types";
@@ -138,6 +138,123 @@ export async function runEmployerIntake(params: {
   } catch (err) {
     console.error("employer intake Gemini failed, using heuristic", err);
     return heuristicEmployerIntake(params.message, params.card, params.chat);
+  }
+}
+
+// --- Streaming turn: reply text streams live; card extraction runs separately ---
+
+const EXTRACTION_ONLY_NOTE =
+  "\n\n(משימה זו: החזר/י אך ורק חילוץ נתונים מובנה לכרטיס מתוך ההודעה האחרונה. אל תנסח/י תשובת שיחה בשדה כלשהו.)";
+
+/** Stream ONLY the conversational reply (no schema → clean token stream). */
+export function streamEmployeeReply(params: {
+  message: string;
+  card: CandidateCard;
+  chat: ChatMessage[];
+  pendingQuestions: FieldQuestion[];
+  systemPrompt: string;
+}): { textStream: AsyncIterable<string> } {
+  const { system, messages } = buildEmployeeConversation({
+    template: params.systemPrompt,
+    message: params.message,
+    card: params.card,
+    chat: params.chat,
+    pendingQuestions: params.pendingQuestions,
+  });
+  const result = streamText({ model: model(), temperature: 0.7, system, messages });
+  return { textStream: result.textStream };
+}
+
+export function streamEmployerReply(params: {
+  message: string;
+  card: JobCard;
+  chat: ChatMessage[];
+  systemPrompt: string;
+}): { textStream: AsyncIterable<string> } {
+  const { system, messages } = buildEmployerConversation({
+    template: params.systemPrompt,
+    message: params.message,
+    card: params.card,
+    chat: params.chat,
+  });
+  const result = streamText({ model: model(), temperature: 0.7, system, messages });
+  return { textStream: result.textStream };
+}
+
+/** Extract structured card fields for the turn (runs off the reply's critical path). */
+export async function extractEmployeePatch(params: {
+  message: string;
+  card: CandidateCard;
+  chat: ChatMessage[];
+  pendingQuestions: FieldQuestion[];
+  systemPrompt: string;
+}): Promise<{
+  candidatePatch: CandidatePatch;
+  fieldAnswers: { questionId: string; answer: string }[];
+  usage?: AiTokenUsage;
+}> {
+  try {
+    const { system, messages } = buildEmployeeConversation({
+      template: params.systemPrompt,
+      message: params.message,
+      card: params.card,
+      chat: params.chat,
+      pendingQuestions: params.pendingQuestions,
+    });
+    const { object, usage } = await generateObject({
+      model: model(),
+      temperature: 0.25,
+      schema: z.object({
+        patch: candidatePatchSchema,
+        fieldAnswers: z
+          .array(z.object({ questionId: z.string(), answer: z.string() }))
+          .default([]),
+      }),
+      system: system + EXTRACTION_ONLY_NOTE,
+      messages,
+    });
+    return {
+      candidatePatch: object.patch,
+      fieldAnswers: object.fieldAnswers,
+      usage: extractUsage(usage),
+    };
+  } catch (err) {
+    console.error("employee patch extraction failed, using heuristic", err);
+    const h = heuristicEmployeeIntake(
+      params.message,
+      params.card,
+      params.pendingQuestions,
+      params.chat,
+    );
+    return { candidatePatch: h.candidatePatch ?? {}, fieldAnswers: h.fieldAnswers ?? [] };
+  }
+}
+
+export async function extractEmployerPatch(params: {
+  message: string;
+  card: JobCard;
+  chat: ChatMessage[];
+  systemPrompt: string;
+}): Promise<{ jobPatch: JobPatch; usage?: AiTokenUsage }> {
+  try {
+    const { system, messages } = buildEmployerConversation({
+      template: params.systemPrompt,
+      message: params.message,
+      card: params.card,
+      chat: params.chat,
+    });
+    const { object, usage } = await generateObject({
+      model: model(),
+      temperature: 0.25,
+      schema: z.object({ patch: jobPatchSchema }),
+      system: system + EXTRACTION_ONLY_NOTE,
+      messages,
+    });
+    return { jobPatch: object.patch, usage: extractUsage(usage) };
+  } catch (err) {
+    console.error("employer patch extraction failed, using heuristic", err);
+    const h = heuristicEmployerIntake(params.message, params.card, params.chat);
+    return { jobPatch: h.jobPatch ?? {} };
   }
 }
 

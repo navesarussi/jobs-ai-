@@ -31,6 +31,7 @@ export function ChatPanel(props: {
   const [messages, setMessages] = useState<Msg[]>(props.initialMessages);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [streamingId, setStreamingId] = useState<string | null>(null);
   const [provider, setProvider] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +49,19 @@ export function ChatPanel(props: {
     setInput("");
     setBusy(true);
     setMessages((m) => [...m, { id: `local-${Date.now()}`, role: "user", content: text }]);
+
+    const assistantId = `a-${Date.now()}`;
+    let acc = "";
+    let started = false;
+    const upsertAssistant = (content: string) => {
+      setMessages((m) => {
+        if (m.some((x) => x.id === assistantId)) {
+          return m.map((x) => (x.id === assistantId ? { ...x, content } : x));
+        }
+        return [...m, { id: assistantId, role: "assistant", content }];
+      });
+    };
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -60,30 +74,64 @@ export function ChatPanel(props: {
           jobId: props.jobId,
         }),
       });
-      const data = (await res.json()) as ChatTurnPayload;
-      if (data.error) {
-        setMessages((m) => [
-          ...m,
-          { id: `err-${Date.now()}`, role: "assistant", content: data.error! },
-        ]);
+
+      if (!res.body) {
+        // Non-streaming fallback (e.g. a buffered error response).
+        const data = (await res.json().catch(() => null)) as ChatTurnPayload | null;
+        upsertAssistant(data?.reply ?? data?.error ?? t.chat.replyFailed);
+        if (data && !data.error) props.onTurn?.(data);
         return;
       }
-      setProvider(data.provider ?? data.aiMode ?? "");
-      setMessages((m) => [
-        ...m,
-        {
-          id: `a-${Date.now()}`,
-          role: "assistant",
-          content: data.reply ?? t.chat.replyFailed,
-        },
-      ]);
-      props.onTurn?.(data);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalPayload: ChatTurnPayload | null = null;
+      let errorText: string | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+          let evt: { type?: string; text?: string; error?: string } & ChatTurnPayload;
+          try {
+            evt = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (evt.type === "delta") {
+            acc += evt.text ?? "";
+            if (!started) {
+              started = true;
+              setStreamingId(assistantId);
+            }
+            upsertAssistant(acc);
+          } else if (evt.type === "final") {
+            finalPayload = evt;
+          } else if (evt.type === "error") {
+            errorText = evt.error ?? t.chat.replyFailed;
+          }
+        }
+      }
+
+      if (errorText) {
+        upsertAssistant(errorText);
+      } else if (finalPayload) {
+        setProvider(finalPayload.provider ?? finalPayload.aiMode ?? "");
+        upsertAssistant(finalPayload.reply ?? acc ?? t.chat.replyFailed);
+        props.onTurn?.(finalPayload);
+      } else if (!started) {
+        upsertAssistant(t.chat.replyFailed);
+      }
     } catch {
-      setMessages((m) => [
-        ...m,
-        { id: `err-${Date.now()}`, role: "assistant", content: t.chat.replyFailed },
-      ]);
+      upsertAssistant(acc || t.chat.replyFailed);
     } finally {
+      setStreamingId(null);
       setBusy(false);
     }
   }
@@ -135,7 +183,7 @@ export function ChatPanel(props: {
             type="button"
             onClick={() => void resetChat()}
             disabled={busy}
-            className="rounded-lg border border-[var(--stroke)] bg-white px-2.5 py-1 text-[11px] text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+            className="press focus-ring rounded-lg border border-[var(--stroke)] bg-white px-2.5 py-1 text-[11px] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
           >
             {t.chat.reset}
           </button>
@@ -148,19 +196,24 @@ export function ChatPanel(props: {
             {props.role === "employee" ? t.chat.employeeEmptyHint : t.chat.employerEmptyHint}
           </div>
         ) : null}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={
-              m.role === "user"
-                ? "chat-msg ms-8 rounded-2xl rounded-se-md bg-[var(--accent)] px-3.5 py-2.5 text-sm leading-6 text-white shadow-[0_8px_20px_rgba(12,107,102,0.22)]"
-                : "chat-msg me-8 rounded-2xl rounded-ss-md border border-[var(--stroke)] bg-white px-3.5 py-2.5 text-sm leading-6 text-[var(--ink)] shadow-[0_6px_16px_rgba(16,36,42,0.04)]"
-            }
-          >
-            {m.content}
-          </div>
-        ))}
-        {busy ? (
+        {messages.map((m) => {
+          const streaming = m.id === streamingId && m.role === "assistant";
+          return (
+            <div
+              key={m.id}
+              className={
+                (m.role === "user"
+                  ? "chat-msg ms-8 rounded-2xl rounded-se-md bg-[var(--accent)] px-3.5 py-2.5 text-sm leading-6 text-white shadow-[0_8px_20px_rgba(12,107,102,0.22)]"
+                  : "chat-msg me-8 rounded-2xl rounded-ss-md border border-[var(--stroke)] bg-white px-3.5 py-2.5 text-sm leading-6 text-[var(--ink)] shadow-[0_6px_16px_rgba(16,36,42,0.04)]") +
+                " whitespace-pre-wrap break-words" +
+                (streaming ? " stream-caret" : "")
+              }
+            >
+              {m.content}
+            </div>
+          );
+        })}
+        {busy && !streamingId ? (
           <div className="chat-msg me-8 inline-flex items-center gap-2 rounded-2xl border border-[var(--stroke)] bg-white px-3.5 py-2.5 text-xs text-[var(--muted)]">
             <span>{t.chat.typing}</span>
             <span className="typing-dots" aria-hidden>
@@ -182,13 +235,13 @@ export function ChatPanel(props: {
               if (e.key === "Enter") void send();
             }}
             placeholder={props.placeholder}
-            className="flex-1 rounded-xl border border-[var(--stroke)] bg-[var(--bg)]/40 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:bg-white"
+            className="focus-ring flex-1 rounded-xl border border-[var(--stroke)] bg-[var(--bg)]/40 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:bg-white"
           />
           <button
             type="button"
             onClick={() => void send()}
             disabled={busy}
-            className="rounded-xl bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent)] disabled:opacity-50"
+            className="press focus-ring rounded-xl bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent)] disabled:opacity-50"
           >
             {t.chat.send}
           </button>
