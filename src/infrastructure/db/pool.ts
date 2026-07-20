@@ -2,9 +2,7 @@ import { Pool } from "pg";
 import { poolerConnectionCandidates } from "./connection-string";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __shidukhPg: Pool | undefined;
-  // eslint-disable-next-line no-var
   var __shidukhPgResolving: Promise<Pool> | undefined;
 }
 
