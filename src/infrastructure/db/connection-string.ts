@@ -21,7 +21,6 @@ export function toPoolerConnectionString(
     url.username = `postgres.${ref}`;
     url.hostname = `aws-0-${poolerRegion}.pooler.supabase.com`;
     url.port = "6543";
-    url.searchParams.set("sslmode", "require");
     return url.toString();
   } catch {
     return connectionString;
