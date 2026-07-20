@@ -1,17 +1,38 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Locale } from "@/i18n/types";
+import type { Role } from "@/domain/types";
+import {
+  getOrCreateDeviceId,
+  readRoleDefault,
+  roleHomePath,
+  writeRoleDefault,
+  writeStoredUser,
+} from "@/lib/client-session";
 
 export function SettingsMenu() {
   const { t, locale, setLocale } = useTranslation();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
   const [rating, setRating] = useState(0);
+  const [roleDefault, setRoleDefault] = useState<Role | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [busyRole, setBusyRole] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  useEffect(() => {
+    setRoleDefault(readRoleDefault());
+    void fetch("/api/session")
+      .then((r) => r.json())
+      .then((d) => setIsAdmin(Boolean(d.isAdmin)))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -32,6 +53,35 @@ export function SettingsMenu() {
   function switchLocale(next: Locale) {
     setLocale(next);
     setOpen(false);
+  }
+
+  async function applyRoleDefault(role: Role | null) {
+    writeRoleDefault(role);
+    setRoleDefault(role);
+    if (!role) {
+      setOpen(false);
+      return;
+    }
+    setBusyRole(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role,
+          deviceId: getOrCreateDeviceId(),
+          locale,
+        }),
+      });
+      const data = await res.json();
+      if (data.user?.id) {
+        writeStoredUser(data.user);
+        router.push(roleHomePath(role));
+      }
+    } finally {
+      setBusyRole(false);
+      setOpen(false);
+    }
   }
 
   function reportIssue() {
@@ -70,11 +120,39 @@ export function SettingsMenu() {
         <div
           id={menuId}
           role="menu"
-          className="premium-panel absolute end-0 top-12 w-64 overflow-hidden rounded-2xl py-1 text-sm"
+          className="premium-panel absolute end-0 top-12 max-h-[80vh] w-72 overflow-y-auto rounded-2xl py-1 text-sm"
         >
           <p className="px-3 py-2 text-[11px] font-semibold tracking-wide text-[var(--muted)] uppercase">
             {t.settings.title}
           </p>
+          <MenuSection label={t.settings.defaultRole}>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busyRole}
+              className={itemClass(roleDefault === "employee")}
+              onClick={() => void applyRoleDefault("employee")}
+            >
+              {t.settings.roleEmployee}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busyRole}
+              className={itemClass(roleDefault === "employer")}
+              onClick={() => void applyRoleDefault("employer")}
+            >
+              {t.settings.roleEmployer}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={itemClass(roleDefault === null)}
+              onClick={() => void applyRoleDefault(null)}
+            >
+              {t.settings.roleClear}
+            </button>
+          </MenuSection>
           <MenuSection label={t.settings.language}>
             <button
               type="button"
@@ -94,6 +172,16 @@ export function SettingsMenu() {
             </button>
           </MenuSection>
           <div className="my-1 h-px bg-[var(--stroke)]" />
+          {isAdmin ? (
+            <Link
+              href="/admin"
+              role="menuitem"
+              className={itemClass(false)}
+              onClick={() => setOpen(false)}
+            >
+              {t.settings.adminPortal}
+            </Link>
+          ) : null}
           <Link href="/legal/privacy" role="menuitem" className={itemClass(false)} onClick={() => setOpen(false)}>
             {t.settings.privacy}
           </Link>

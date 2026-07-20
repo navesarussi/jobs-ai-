@@ -6,6 +6,7 @@ import {
   emptyJobCard,
   type StoreData,
 } from "@/domain/types";
+import { normalizeEmployerRecord } from "@/domain/employer-jobs";
 
 function seed(): StoreData {
   return {
@@ -16,7 +17,7 @@ function seed(): StoreData {
     employees: [
       { userId: "e1", card: emptyCandidateCard(), chat: [], pendingFieldQuestionIds: [] },
     ],
-    employers: [{ userId: "b1", card: emptyJobCard(), chat: [] }],
+    employers: [normalizeEmployerRecord({ userId: "b1", card: emptyJobCard(), chat: [], jobs: [], activeJobId: "" })],
     fieldQuestions: [],
     fieldAnswers: [],
     matches: [],

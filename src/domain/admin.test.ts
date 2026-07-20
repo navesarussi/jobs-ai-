@@ -8,6 +8,7 @@ import {
 } from "./admin";
 import type { StoreData } from "./types";
 import { emptyCandidateCard, emptyJobCard } from "./types";
+import { normalizeEmployerRecord } from "./employer-jobs";
 
 function emptyStore(): StoreData {
   return {
@@ -34,13 +35,14 @@ describe("admin", () => {
         { userId: "u1", card: emptyCandidateCard(), chat: [], pendingFieldQuestionIds: [] },
       ],
       employers: [
-        { userId: "demo-employer", card: emptyJobCard(), chat: [] },
-        { userId: "u2", card: emptyJobCard(), chat: [] },
+        normalizeEmployerRecord({ userId: "demo-employer", card: emptyJobCard(), chat: [], jobs: [], activeJobId: "" }),
+        normalizeEmployerRecord({ userId: "u2", card: emptyJobCard(), chat: [], jobs: [], activeJobId: "" }),
       ],
       matches: [
         {
           id: "m1",
           jobOwnerId: "u2",
+          jobId: "u2",
           candidateId: "u1",
           score: 0.8,
           reason: "fit",

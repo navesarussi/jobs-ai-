@@ -19,3 +19,6 @@ Architecture: Domain ← Application ← Infrastructure / App.
 - DB pool: DNS-filter pooler candidates then probe in small batches; cache last-good URL per instance
 - Session start uses `upsertSessionRole` (no full-store rewrite)
 - Default pooler preference: `aws-1` / `ap-south-1` (prod `resolvedHost`); override via `SUPABASE_POOLER_*`
+- Google OAuth soft-disabled via `GOOGLE_AUTH_ENABLED` (open local sessions while false)
+- Employer multi-job: `jobs` jsonb + `matches.job_id`; active job drives chat/candidates
+- [PENDING REFACTOR]: split `SettingsMenu.tsx` / `application/chat.ts` under 200-line cap

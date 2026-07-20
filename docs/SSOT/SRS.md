@@ -14,9 +14,10 @@ Match employers and candidates **without search**. Agents extract rich profiles 
 ## Functional requirements
 
 ### FR-AUTH
-- Google OAuth required for real users
-- Demo mode only when `ALLOW_DEMO=true` (dev)
-- API actions must be authorized for the acting user
+- Google OAuth available when `GOOGLE_AUTH_ENABLED=true` and Google credentials are set
+- While Google is soft-disabled (`GOOGLE_AUTH_ENABLED` unset/false), open local sessions are allowed for chat development (Google code remains in the repo)
+- Demo mode when `ALLOW_DEMO=true`
+- API actions must be authorized for the acting user (or open-dev actor when Google is soft-disabled)
 
 ### FR-CARDS
 - Candidate and job cards have many predefined fields (empty until filled)
@@ -47,9 +48,18 @@ Match employers and candidates **without search**. Agents extract rich profiles 
 ### FR-UI
 | ID | Requirement |
 |---|---|
-| FR-UI-01 | Global settings control (top corner): language, privacy, terms, report a problem, rate the app, about |
-| FR-UI-02 | Starting as employee/employer must succeed for signed-in Google users without opaque server errors |
+| FR-UI-01 | Global settings control (top corner): language, privacy, terms, report a problem, rate the app, about, admin portal (when allowed), default role switch |
+| FR-UI-02 | Starting as employee/employer must succeed without opaque server errors |
 | FR-UI-03 | App entry and admin portal must not hang indefinitely on loading |
+| FR-UI-04 | Remember default role (employee/employer); home auto-opens that role’s screen (chat + jobs / chat + candidates) |
+| FR-UI-05 | Screens paint shell UI immediately; hydrate chat/lists in the background — no full-page “טוען…” gate |
+| FR-UI-06 | Every chat has a reset-conversation control |
+
+### FR-EMPLOYER-JOBS
+| ID | Requirement |
+|---|---|
+| FR-JOB-01 | Approved employers may publish multiple jobs |
+| FR-JOB-02 | Employer screen filters by active job; each job has its own chat and candidate list |
 
 ## Non-goals (current POC)
 

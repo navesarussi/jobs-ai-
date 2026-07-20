@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { NotFoundError, ValidationError } from "@/domain/errors";
+import { getActiveJob, normalizeEmployerRecord } from "@/domain/employer-jobs";
 import { normalizeField } from "@/domain/field-questions";
 import type { FieldQuestion, Match, StoreData } from "@/domain/types";
 import { rebuildMatches } from "./rebuild-matches";
@@ -32,6 +33,7 @@ export function askFieldQuestion(
     employerId: string;
     matchId: string;
     question: string;
+    jobId?: string;
   },
 ): StoreData {
   const q = params.question.trim();
@@ -42,10 +44,14 @@ export function askFieldQuestion(
     throw new NotFoundError("Match");
   }
 
-  const employer = store.employers.find((e) => e.userId === params.employerId);
-  if (!employer) throw new NotFoundError("Employer");
+  const raw = store.employers.find((e) => e.userId === params.employerId);
+  if (!raw) throw new NotFoundError("Employer");
+  const employer = normalizeEmployerRecord(raw);
+  const job =
+    employer.jobs.find((j) => j.id === (params.jobId ?? match.jobId ?? employer.activeJobId)) ??
+    getActiveJob(employer);
 
-  const field = employer.card.field.trim();
+  const field = job.card.field.trim();
   if (!field) throw new ValidationError("יש להגדיר תחום במשרה לפני שאלות כלליות");
 
   const existing = store.fieldQuestions.find(
@@ -59,7 +65,7 @@ export function askFieldQuestion(
     id: randomUUID(),
     field,
     question: q,
-    sourceJobId: params.employerId,
+    sourceJobId: job.id,
     sourceEmployerId: params.employerId,
     createdAt: new Date().toISOString(),
   };

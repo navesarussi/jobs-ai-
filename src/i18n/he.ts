@@ -38,6 +38,9 @@ export const he: Messages = {
     demoEmployeeDev: "דמו עובד/ת (פיתוח בלבד)",
     demoEmployerDev: "דמו מעסיק/ה (פיתוח בלבד)",
     adminPortal: "פורטל מנהלים",
+    openAuthHint: "התחברות Google מושהית כרגע — בחרו תפקיד והתחילו לצ׳אט.",
+    openingRole: "פותחים את המסך שלכם…",
+    realUsersTitleOpen: "איך תרצו להמשיך?",
   },
   session: {
     noActiveSession: "אין סשן פעיל.",
@@ -61,6 +64,11 @@ export const he: Messages = {
     reportBody: "תארו את הבעיה:",
     rateSubject: "שידוך — דירוג האפליקציה",
     rateBody: "הדירוג שלי",
+    defaultRole: "תפקיד ברירת מחדל",
+    roleEmployee: "מחפש/ת עבודה",
+    roleEmployer: "מעסיק/ה",
+    roleClear: "לשאול בכל כניסה למסך הראשי",
+    adminPortal: "פורטל מנהלים",
   },
   legal: {
     privacyTitle: "מדיניות פרטיות",
@@ -87,6 +95,9 @@ export const he: Messages = {
     chatTab: "שיחה",
     candidatesTab: "מועמדים ({count})",
     chatPlaceholder: "למשל: מחפש מלצר/ית למסעדה בתל אביב…",
+    jobsFilter: "משרות",
+    newJob: "משרה חדשה",
+    jobFallback: "משרה {n}",
   },
   chat: {
     title: "שיחה עם הסוכן",
@@ -99,6 +110,8 @@ export const he: Messages = {
     typing: "הסוכן כותב…",
     send: "שליחה",
     replyFailed: "לא הצלחתי לענות",
+    reset: "איפוס צ׳אט",
+    resetConfirm: "לנקות את השיחה הזו?",
   },
   profile: {
     yourCard: "הפרופיל שלך",

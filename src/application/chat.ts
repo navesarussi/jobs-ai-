@@ -2,6 +2,12 @@ import { randomUUID } from "crypto";
 import { NotFoundError } from "@/domain/errors";
 import { createAiUsageRecord } from "@/domain/admin";
 import {
+  getActiveJob,
+  normalizeEmployerRecord,
+  updateJobSlot,
+  withActiveJob,
+} from "@/domain/employer-jobs";
+import {
   mergeAnswerIntoCard,
   unansweredQuestionsForCandidate,
 } from "@/domain/field-questions";
@@ -84,6 +90,7 @@ export type ChatTurnResult = {
   card: CandidateCard | JobCard;
   chat: ChatMessage[];
   pendingQuestions: { id: string; question: string }[];
+  jobId?: string;
 };
 
 export async function handleEmployeeChat(
@@ -146,7 +153,6 @@ export async function handleEmployeeChat(
         : e,
     ),
   };
-  // Match rebuild is deferred by the API route so the reply returns faster.
   next = recordAiUsage(next, "employee_intake", intake.usage);
   const empNext = next.employees.find((e) => e.userId === userId)!;
   const pendingOut = next.fieldQuestions.filter((q) =>
@@ -166,25 +172,31 @@ export async function handleEmployerChat(
   store: StoreData,
   userId: string,
   message: string,
+  jobId?: string,
 ): Promise<ChatTurnResult> {
-  const er = store.employers.find((e) => e.userId === userId);
-  if (!er) throw new NotFoundError("Employer");
+  const raw = store.employers.find((e) => e.userId === userId);
+  if (!raw) throw new NotFoundError("Employer");
+
+  let employer = normalizeEmployerRecord(raw);
+  if (jobId) employer = withActiveJob(employer, jobId);
+  const active = getActiveJob(employer);
 
   const prompts = resolveAdminSettings(store.adminSettings);
   const intake = await runEmployerIntake({
     message,
-    card: er.card,
-    chat: er.chat,
+    card: active.card,
+    chat: active.chat,
     systemPrompt: prompts.employerPrompt,
   });
 
-  const card = applyJobPatch(er.card, intake.jobPatch);
-  const chat = pushChat(pushChat(er.chat, "user", message), "assistant", intake.reply);
+  const card = applyJobPatch(active.card, intake.jobPatch);
+  const chat = pushChat(pushChat(active.chat, "user", message), "assistant", intake.reply);
+  const updated = updateJobSlot(employer, active.id, { card, chat });
+  const mirrored = withActiveJob(updated, active.id);
+
   let next: StoreData = {
     ...store,
-    employers: store.employers.map((e) =>
-      e.userId === userId ? { ...e, card, chat } : e,
-    ),
+    employers: store.employers.map((e) => (e.userId === userId ? mirrored : e)),
   };
   next = recordAiUsage(next, "employer_intake", intake.usage);
   return {
@@ -194,5 +206,31 @@ export async function handleEmployerChat(
     card,
     chat,
     pendingQuestions: [],
+    jobId: active.id,
+  };
+}
+
+export function resetChat(
+  store: StoreData,
+  userId: string,
+  role: "employee" | "employer",
+  jobId?: string,
+): StoreData {
+  if (role === "employee") {
+    return {
+      ...store,
+      employees: store.employees.map((e) =>
+        e.userId === userId ? { ...e, chat: [] } : e,
+      ),
+    };
+  }
+  return {
+    ...store,
+    employers: store.employers.map((e) => {
+      if (e.userId !== userId) return e;
+      const employer = normalizeEmployerRecord(e);
+      const targetId = jobId ?? employer.activeJobId;
+      return updateJobSlot(employer, targetId, { chat: [] });
+    }),
   };
 }

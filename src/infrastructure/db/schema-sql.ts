@@ -23,6 +23,8 @@ create index if not exists employee_profiles_card_gin on employee_profiles using
 create table if not exists employer_profiles (
   user_id text primary key references app_users (id) on delete cascade,
   card jsonb not null default '{}'::jsonb,
+  jobs jsonb not null default '[]'::jsonb,
+  active_job_id text,
   updated_at timestamptz not null default now()
 );
 create index if not exists employer_profiles_card_gin on employer_profiles using gin (card);
@@ -57,6 +59,7 @@ create table if not exists field_answers (
 create table if not exists matches (
   id text primary key,
   job_owner_id text not null references app_users (id) on delete cascade,
+  job_id text,
   candidate_id text not null references app_users (id) on delete cascade,
   score double precision not null,
   reason text not null,

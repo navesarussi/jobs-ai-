@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { getMessages } from "@/i18n";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/types";
 import type { StoreData } from "@/domain/types";
+import { allowOpenAuth } from "@/infrastructure/auth-flags";
 import { readStore } from "@/infrastructure/store";
 
 export function allowDemo(): boolean {
@@ -22,6 +23,13 @@ export async function assertActor(
   const store = await readStore();
 
   if (allowDemo() && isDemoUserId(userId)) {
+    return { ok: true, store };
+  }
+
+  // Soft-open mode for chat development (Google OAuth temporarily inactive).
+  if (allowOpenAuth()) {
+    const user = store.users.find((u) => u.id === userId);
+    if (!user) return { ok: false, status: 404, error: api.userNotFound };
     return { ok: true, store };
   }
 

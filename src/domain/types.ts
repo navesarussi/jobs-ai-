@@ -136,10 +136,20 @@ export type EmployeeRecord = {
   pendingFieldQuestionIds: string[];
 };
 
-export type EmployerRecord = {
-  userId: string;
+export type JobSlot = {
+  id: string;
   card: JobCard;
   chat: ChatMessage[];
+};
+
+export type EmployerRecord = {
+  userId: string;
+  /** Mirrors the active job card (compat + matching helpers). */
+  card: JobCard;
+  /** Mirrors the active job chat. */
+  chat: ChatMessage[];
+  jobs: JobSlot[];
+  activeJobId: string;
 };
 
 export type FieldQuestion = {
@@ -163,6 +173,8 @@ export type MatchStatus = "queued" | "approved" | "rejected";
 export type Match = {
   id: string;
   jobOwnerId: string;
+  /** Job slot id; falls back to jobOwnerId for legacy rows. */
+  jobId: string;
   candidateId: string;
   score: number;
   reason: string;

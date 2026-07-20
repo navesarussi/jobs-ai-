@@ -13,7 +13,7 @@ function emptyStore(): StoreData {
   return {
     users: [],
     employees: [{ userId: "u1", card: emptyCandidateCard(), chat: [], pendingFieldQuestionIds: [] }],
-    employers: [{ userId: "u2", card: emptyJobCard(), chat: [] }],
+    employers: [{ userId: "u2", card: emptyJobCard(), chat: [], jobs: [{ id: "u2", card: emptyJobCard(), chat: [] }], activeJobId: "u2" }],
     fieldQuestions: [],
     fieldAnswers: [],
     matches: [],

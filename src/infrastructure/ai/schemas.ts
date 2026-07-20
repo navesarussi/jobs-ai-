@@ -133,12 +133,9 @@ export function hasGeminiKey(): boolean {
   return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim());
 }
 
-export function hasGoogleAuth(): boolean {
-  return Boolean(
-    process.env.AUTH_GOOGLE_ID?.trim() && process.env.AUTH_GOOGLE_SECRET?.trim(),
-  );
-}
-
-export function allowDemoMode(): boolean {
-  return process.env.ALLOW_DEMO === "true";
-}
+export {
+  allowDemoMode,
+  allowOpenAuth,
+  hasGoogleAuth,
+  isGoogleAuthEnabled,
+} from "@/infrastructure/auth-flags";

@@ -12,6 +12,7 @@ export async function POST(req: Request) {
       userId?: string;
       role?: "employee" | "employer";
       message?: string;
+      jobId?: string;
     };
     if (!body.userId || !body.message?.trim()) {
       return ok({ error: "חסרים פרטים" }, { status: 400 });
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     const result =
       role === "employee"
         ? await handleEmployeeChat(store, body.userId, body.message.trim())
-        : await handleEmployerChat(store, body.userId, body.message.trim());
+        : await handleEmployerChat(store, body.userId, body.message.trim(), body.jobId);
 
     await writeStore(result.store);
 
@@ -54,6 +55,7 @@ export async function POST(req: Request) {
       card: result.card,
       chat: result.chat,
       pendingQuestions: result.pendingQuestions,
+      jobId: result.jobId,
     });
   } catch (e) {
     return fail(e);

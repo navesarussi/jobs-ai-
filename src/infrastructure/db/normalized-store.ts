@@ -6,6 +6,7 @@ import {
   normalizeCandidateCard,
   normalizeJobCard,
 } from "@/domain/types";
+import { normalizeEmployerRecord } from "@/domain/employer-jobs";
 import { ensureSchema, hasNormalizedData } from "./schema";
 import { registerFieldQuestionDefinition } from "./field-definitions";
 import { getPool } from "./pool";
@@ -19,15 +20,14 @@ function normalizeStore(raw: StoreData): StoreData {
       pendingFieldQuestionIds: e.pendingFieldQuestionIds ?? [],
       chat: e.chat ?? [],
     })),
-    employers: (raw.employers ?? []).map((e) => ({
-      ...e,
-      card: normalizeJobCard(e.card),
-      chat: e.chat ?? [],
-    })),
+    employers: (raw.employers ?? []).map((e) => normalizeEmployerRecord(e as never)),
     users: raw.users ?? [],
     fieldQuestions: raw.fieldQuestions ?? [],
     fieldAnswers: raw.fieldAnswers ?? [],
-    matches: raw.matches ?? [],
+    matches: (raw.matches ?? []).map((m) => ({
+      ...m,
+      jobId: m.jobId || m.jobOwnerId,
+    })),
     adminSettings: raw.adminSettings,
     aiUsage: raw.aiUsage ?? [],
   };
@@ -84,16 +84,21 @@ async function loadFromTables(client: PoolClient): Promise<StoreData> {
         createdAt: new Date(m.created_at).toISOString(),
       })),
     })),
-    employers: employers.rows.map((e) => ({
-      userId: e.user_id,
-      card: e.card,
-      chat: (chatByOwner.get(e.user_id) ?? []).map((m) => ({
+    employers: employers.rows.map((e) => {
+      const legacyChat = (chatByOwner.get(e.user_id) ?? []).map((m) => ({
         id: m.id,
         role: m.role,
         content: m.content,
         createdAt: new Date(m.created_at).toISOString(),
-      })),
-    })),
+      }));
+      return normalizeEmployerRecord({
+        userId: e.user_id,
+        card: e.card,
+        chat: legacyChat,
+        jobs: e.jobs ?? [],
+        activeJobId: e.active_job_id ?? "",
+      });
+    }),
     fieldQuestions: questions.rows.map((q) => ({
       id: q.id,
       field: q.field,
@@ -111,6 +116,7 @@ async function loadFromTables(client: PoolClient): Promise<StoreData> {
     matches: matches.rows.map((m) => ({
       id: m.id,
       jobOwnerId: m.job_owner_id,
+      jobId: m.job_id || m.job_owner_id,
       candidateId: m.candidate_id,
       score: m.score,
       reason: m.reason,
@@ -199,11 +205,21 @@ async function persistStore(client: PoolClient, store: StoreData): Promise<void>
   }
 
   for (const er of normalized.employers) {
+    const employer = normalizeEmployerRecord(er);
     await client.query(
-      `insert into employer_profiles (user_id, card, updated_at)
-       values ($1, $2::jsonb, now())
-       on conflict (user_id) do update set card = excluded.card, updated_at = now()`,
-      [er.userId, JSON.stringify(er.card)],
+      `insert into employer_profiles (user_id, card, jobs, active_job_id, updated_at)
+       values ($1, $2::jsonb, $3::jsonb, $4, now())
+       on conflict (user_id) do update set
+         card = excluded.card,
+         jobs = excluded.jobs,
+         active_job_id = excluded.active_job_id,
+         updated_at = now()`,
+      [
+        employer.userId,
+        JSON.stringify(employer.card),
+        JSON.stringify(employer.jobs),
+        employer.activeJobId,
+      ],
     );
   }
   if (employerIds.length) {
@@ -231,7 +247,8 @@ async function persistStore(client: PoolClient, store: StoreData): Promise<void>
     }
   }
   for (const er of normalized.employers) {
-    for (const msg of er.chat) {
+    const employer = normalizeEmployerRecord(er);
+    for (const msg of employer.chat) {
       await client.query(
         `insert into chat_messages (id, owner_user_id, role, content, created_at)
          values ($1, $2, $3, $4, $5)
@@ -239,7 +256,7 @@ async function persistStore(client: PoolClient, store: StoreData): Promise<void>
            owner_user_id = excluded.owner_user_id,
            role = excluded.role,
            content = excluded.content`,
-        [msg.id, er.userId, msg.role, msg.content, msg.createdAt],
+        [msg.id, employer.userId, msg.role, msg.content, msg.createdAt],
       );
     }
   }
@@ -266,9 +283,19 @@ async function persistStore(client: PoolClient, store: StoreData): Promise<void>
   await client.query(`delete from matches`);
   for (const m of normalized.matches) {
     await client.query(
-      `insert into matches (id, job_owner_id, candidate_id, score, reason, status, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [m.id, m.jobOwnerId, m.candidateId, m.score, m.reason, m.status, m.createdAt, m.updatedAt],
+      `insert into matches (id, job_owner_id, job_id, candidate_id, score, reason, status, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        m.id,
+        m.jobOwnerId,
+        m.jobId || m.jobOwnerId,
+        m.candidateId,
+        m.score,
+        m.reason,
+        m.status,
+        m.createdAt,
+        m.updatedAt,
+      ],
     );
   }
   void matchIds;
@@ -310,7 +337,15 @@ function seedStore(): StoreData {
     employees: [
       { userId: empId, card: emptyCandidateCard(), chat: [], pendingFieldQuestionIds: [] },
     ],
-    employers: [{ userId: bossId, card: emptyJobCard(), chat: [] }],
+    employers: [
+      normalizeEmployerRecord({
+        userId: bossId,
+        card: emptyJobCard(),
+        chat: [],
+        jobs: [],
+        activeJobId: "",
+      }),
+    ],
     fieldQuestions: [],
     fieldAnswers: [],
     matches: [],
@@ -336,11 +371,23 @@ export async function upsertSessionRole(user: User, role: Role): Promise<User> {
         [user.id, JSON.stringify(emptyCandidateCard())],
       );
     } else {
+      const starter = normalizeEmployerRecord({
+        userId: user.id,
+        card: emptyJobCard(),
+        chat: [],
+        jobs: [],
+        activeJobId: "",
+      });
       await client.query(
-        `insert into employer_profiles (user_id, card, updated_at)
-         values ($1, $2::jsonb, now())
+        `insert into employer_profiles (user_id, card, jobs, active_job_id, updated_at)
+         values ($1, $2::jsonb, $3::jsonb, $4, now())
          on conflict (user_id) do nothing`,
-        [user.id, JSON.stringify(emptyJobCard())],
+        [
+          user.id,
+          JSON.stringify(starter.card),
+          JSON.stringify(starter.jobs),
+          starter.activeJobId,
+        ],
       );
     }
     await client.query("commit");

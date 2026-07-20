@@ -2,7 +2,11 @@ import { randomUUID } from "crypto";
 import { auth } from "@/auth";
 import type { Role, User } from "@/domain/types";
 import { ok, fail } from "@/infrastructure/http";
-import { allowDemoMode, hasGoogleAuth } from "@/infrastructure/ai/schemas";
+import {
+  allowDemoMode,
+  allowOpenAuth,
+  hasGoogleAuth,
+} from "@/infrastructure/auth-flags";
 import { isAdminEmail } from "@/infrastructure/admin-config";
 import { allowDemo } from "@/infrastructure/auth-guard";
 import {
@@ -13,13 +17,23 @@ import { readStore } from "@/infrastructure/store";
 
 export async function GET() {
   const session = await auth();
-  const isAdmin = isAdminEmail(session?.user?.email);
-  return ok({ googleAuth: hasGoogleAuth(), allowDemo: allowDemoMode(), isAdmin });
+  const isAdmin = isAdminEmail(session?.user?.email) || allowOpenAuth();
+  return ok({
+    googleAuth: hasGoogleAuth(),
+    allowDemo: allowDemoMode(),
+    openAuth: allowOpenAuth(),
+    isAdmin,
+  });
 }
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { role?: Role; demo?: boolean; name?: string };
+    const body = (await req.json()) as {
+      role?: Role;
+      demo?: boolean;
+      name?: string;
+      deviceId?: string;
+    };
     const role: Role = body.role === "employer" ? "employer" : "employee";
 
     if (body.demo) {
@@ -29,6 +43,21 @@ export async function POST(req: Request) {
       const store = await readStore();
       const demoId = role === "employee" ? "demo-employee" : "demo-employer";
       return ok({ user: store.users.find((u) => u.id === demoId) });
+    }
+
+    if (allowOpenAuth()) {
+      const deviceId = body.deviceId?.trim() || randomUUID();
+      const existing = await findUserByEmailOrGoogle(`open:${deviceId}`, deviceId);
+      const base: User = existing ?? {
+        id: randomUUID(),
+        name: body.name?.trim() || (role === "employee" ? "מועמד/ת" : "מעסיק/ה"),
+        role,
+        email: `open:${deviceId}@local.dev`,
+        googleId: deviceId,
+        createdAt: new Date().toISOString(),
+      };
+      const user = await upsertSessionRole({ ...base, role }, role);
+      return ok({ user });
     }
 
     const session = await auth();

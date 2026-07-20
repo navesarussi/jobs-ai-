@@ -1,11 +1,19 @@
 "use client";
 
 import { signIn, signOut, useSession } from "next-auth/react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "@/components/LocaleProvider";
+import type { Role } from "@/domain/types";
+import {
+  getOrCreateDeviceId,
+  readRoleDefault,
+  readStoredUser,
+  roleHomePath,
+  writeRoleDefault,
+  writeStoredUser,
+} from "@/lib/client-session";
 
 export default function HomePage() {
   const router = useRouter();
@@ -15,7 +23,9 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [googleAuth, setGoogleAuth] = useState(false);
   const [allowDemo, setAllowDemo] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [openAuth, setOpenAuth] = useState(true);
+  const [flagsReady, setFlagsReady] = useState(false);
+  const autoStarted = useRef(false);
 
   useEffect(() => {
     void fetch("/api/session")
@@ -23,15 +33,17 @@ export default function HomePage() {
       .then((d) => {
         setGoogleAuth(Boolean(d.googleAuth));
         setAllowDemo(Boolean(d.allowDemo));
-        setIsAdmin(Boolean(d.isAdmin));
+        setOpenAuth(Boolean(d.openAuth));
       })
       .catch(() => {
         setGoogleAuth(false);
         setAllowDemo(false);
-      });
+        setOpenAuth(true);
+      })
+      .finally(() => setFlagsReady(true));
   }, []);
 
-  async function start(role: "employee" | "employer", demo: boolean) {
+  async function start(role: Role, demo: boolean) {
     setBusy(role + (demo ? "-demo" : ""));
     setError(null);
     try {
@@ -40,7 +52,12 @@ export default function HomePage() {
       const res = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, demo, locale }),
+        body: JSON.stringify({
+          role,
+          demo,
+          locale,
+          deviceId: getOrCreateDeviceId(),
+        }),
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -54,14 +71,33 @@ export default function HomePage() {
         setError(t.api.internalError);
         return;
       }
-      localStorage.setItem("shidukh_user", JSON.stringify(user));
-      router.push(role === "employee" ? "/employee" : "/employer");
+      writeStoredUser(user);
+      writeRoleDefault(role);
+      router.replace(roleHomePath(role));
     } catch {
       setError(t.api.internalError);
     } finally {
       setBusy(null);
     }
   }
+
+  useEffect(() => {
+    if (!flagsReady || autoStarted.current) return;
+    const roleDefault = readRoleDefault();
+    const stored = readStoredUser();
+    if (stored && (!roleDefault || stored.role === roleDefault)) {
+      autoStarted.current = true;
+      router.replace(roleHomePath(stored.role));
+      return;
+    }
+    if (roleDefault && (openAuth || allowDemo)) {
+      autoStarted.current = true;
+      void start(roleDefault, false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot entry
+  }, [flagsReady, openAuth, allowDemo, router]);
+
+  const showRolePicker = openAuth || (status === "authenticated" && session?.user);
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-5 py-10 pt-16">
@@ -78,19 +114,29 @@ export default function HomePage() {
       </p>
 
       <section className="premium-panel mt-9 rounded-[1.4rem] p-6">
-        <h2 className="text-base font-semibold text-[var(--ink)]">{t.home.realUsersTitle}</h2>
+        <h2 className="text-base font-semibold text-[var(--ink)]">
+          {openAuth ? t.home.realUsersTitleOpen : t.home.realUsersTitle}
+        </h2>
         {error ? (
           <p className="mt-3 rounded-xl bg-[var(--warn-bg)] px-3 py-2 text-sm text-[var(--warn)]">
             {error}
           </p>
         ) : null}
-        {status === "authenticated" && session?.user ? (
+        {busy ? (
+          <p className="mt-3 text-sm text-[var(--muted)]">{t.home.openingRole}</p>
+        ) : null}
+
+        {showRolePicker ? (
           <div className="mt-4 space-y-3">
-            <p className="text-sm text-[var(--muted)]">
-              {fmt(t.home.connectedAs, {
-                name: session.user.name ?? session.user.email ?? "",
-              })}
-            </p>
+            {status === "authenticated" && session?.user ? (
+              <p className="text-sm text-[var(--muted)]">
+                {fmt(t.home.connectedAs, {
+                  name: session.user.name ?? session.user.email ?? "",
+                })}
+              </p>
+            ) : (
+              <p className="text-xs leading-5 text-[var(--muted)]">{t.home.openAuthHint}</p>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
@@ -109,20 +155,14 @@ export default function HomePage() {
                 {t.home.iAmEmployer}
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => void signOut({ callbackUrl: "/" })}
-              className="text-xs text-[var(--muted)] underline-offset-2 hover:underline"
-            >
-              {t.home.signOut}
-            </button>
-            {isAdmin ? (
-              <Link
-                href="/admin"
-                className="block rounded-xl border border-[var(--gold)]/40 bg-[linear-gradient(180deg,#fffdf8,#f7f1e4)] px-4 py-3 text-center text-sm font-medium text-[var(--hero)]"
+            {status === "authenticated" ? (
+              <button
+                type="button"
+                onClick={() => void signOut({ callbackUrl: "/" })}
+                className="text-xs text-[var(--muted)] underline-offset-2 hover:underline"
               >
-                {t.home.adminPortal}
-              </Link>
+                {t.home.signOut}
+              </button>
             ) : null}
           </div>
         ) : (

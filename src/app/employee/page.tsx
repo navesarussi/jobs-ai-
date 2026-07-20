@@ -7,26 +7,17 @@ import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "@/components/LocaleProvider";
 import { OpportunityList } from "@/components/OpportunityList";
 import { ProfileAside } from "@/components/ProfileAside";
+import { readStoredUser } from "@/lib/client-session";
 
 type Tab = "chat" | "jobs";
-
-function readEmployeeSession(): { id: string; name: string } | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem("shidukh_user");
-    if (!raw) return null;
-    const user = JSON.parse(raw) as { id: string; name: string; role: string };
-    return user.role === "employee" ? { id: user.id, name: user.name } : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function EmployeePage() {
   const { t, fmt, locale } = useTranslation();
   const [tab, setTab] = useState<Tab>("chat");
-  const [sessionUser] = useState(readEmployeeSession);
-  const [bootstrapping, setBootstrapping] = useState(() => Boolean(sessionUser));
+  const [sessionUser] = useState(() => {
+    const u = readStoredUser();
+    return u?.role === "employee" ? u : null;
+  });
   const userId = sessionUser?.id ?? null;
   const name = sessionUser?.name ?? "";
   const [me, setMe] = useState<{
@@ -36,6 +27,7 @@ export default function EmployeePage() {
     error?: string;
   } | null>(null);
   const [jobs, setJobs] = useState([]);
+  const [hydrating, setHydrating] = useState(Boolean(userId));
 
   const refreshLists = useCallback(
     async (id: string) => {
@@ -60,9 +52,7 @@ export default function EmployeePage() {
 
   useEffect(() => {
     if (!userId) return;
-    // Initial session hydrate from API (async setState is intentional).
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount
-    void refresh(userId).finally(() => setBootstrapping(false));
+    void refresh(userId);
   }, [refresh, userId]);
 
   function onTurn(payload: ChatTurnPayload) {
@@ -74,36 +64,22 @@ export default function EmployeePage() {
             chat: (payload.chat as typeof prev.chat) ?? prev.chat,
             pendingQuestions: payload.pendingQuestions ?? prev.pendingQuestions,
           }
-        : prev,
+        : {
+            card: payload.card,
+            chat: (payload.chat as never) ?? [],
+            pendingQuestions: payload.pendingQuestions ?? [],
+          },
     );
     if (userId) void refreshLists(userId);
-  }
-
-  if (bootstrapping) {
-    return (
-      <main className="mx-auto max-w-lg px-5 py-16 text-center text-[var(--muted)]">
-        {t.session.loading}
-      </main>
-    );
   }
 
   if (!userId) {
     return (
       <main className="mx-auto max-w-lg px-5 py-16 text-center">
+        <SettingsMenu />
         <p className="text-[var(--muted)]">{t.session.noActiveSession}</p>
         <Link href="/" className="mt-4 inline-block text-[var(--accent)]">
           {t.session.backToStart}
-        </Link>
-      </main>
-    );
-  }
-
-  if (me?.error) {
-    return (
-      <main className="mx-auto max-w-lg px-5 py-16 text-center">
-        <p className="text-[var(--muted)]">{me.error}</p>
-        <Link href="/" className="mt-4 inline-block text-[var(--accent)]">
-          {t.session.reconnect}
         </Link>
       </main>
     );
@@ -134,27 +110,29 @@ export default function EmployeePage() {
         </div>
       </header>
 
+      {me?.error ? (
+        <p className="mb-4 rounded-xl bg-[var(--warn-bg)] px-3 py-2 text-sm text-[var(--warn)]">
+          {me.error}
+        </p>
+      ) : null}
+
       {tab === "chat" ? (
-        me ? (
-          <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-            <ChatPanel
-              key={`${userId}-employee`}
-              userId={userId}
-              role="employee"
-              locale={locale}
-              initialMessages={me.chat}
-              placeholder={t.employee.chatPlaceholder}
-              onTurn={onTurn}
-            />
-            <ProfileAside
-              kind="employee"
-              card={me.card as never}
-              pendingQuestions={me.pendingQuestions}
-            />
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--muted)]">{t.session.loading}</p>
-        )
+        <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+          <ChatPanel
+            key={`${userId}-employee`}
+            userId={userId}
+            role="employee"
+            locale={locale}
+            initialMessages={me?.chat ?? []}
+            placeholder={t.employee.chatPlaceholder}
+            onTurn={onTurn}
+          />
+          <ProfileAside
+            kind="employee"
+            card={(me?.card as never) ?? null}
+            pendingQuestions={me?.pendingQuestions ?? []}
+          />
+        </div>
       ) : (
         <OpportunityList jobs={jobs} />
       )}

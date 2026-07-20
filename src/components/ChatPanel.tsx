@@ -14,6 +14,7 @@ export type ChatTurnPayload = {
   card?: unknown;
   chat?: Msg[];
   pendingQuestions?: { id: string; question: string }[];
+  jobId?: string;
 };
 
 export function ChatPanel(props: {
@@ -22,7 +23,9 @@ export function ChatPanel(props: {
   locale: Locale;
   initialMessages: Msg[];
   placeholder: string;
+  jobId?: string;
   onTurn?: (payload: ChatTurnPayload) => void;
+  onReset?: () => void;
 }) {
   const { t } = useTranslation();
   const [messages, setMessages] = useState<Msg[]>(props.initialMessages);
@@ -30,6 +33,10 @@ export function ChatPanel(props: {
   const [busy, setBusy] = useState(false);
   const [provider, setProvider] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMessages(props.initialMessages);
+  }, [props.initialMessages, props.jobId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -50,6 +57,7 @@ export function ChatPanel(props: {
           role: props.role,
           message: text,
           locale: props.locale,
+          jobId: props.jobId,
         }),
       });
       const data = (await res.json()) as ChatTurnPayload;
@@ -80,9 +88,34 @@ export function ChatPanel(props: {
     }
   }
 
+  async function resetChat() {
+    if (busy) return;
+    if (!window.confirm(t.chat.resetConfirm)) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/chat/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: props.userId,
+          role: props.role,
+          jobId: props.jobId,
+        }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setMessages([]);
+        props.onReset?.();
+        props.onTurn?.({ chat: [], card: data.card, jobId: data.jobId });
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="premium-panel flex h-full min-h-[440px] flex-col overflow-hidden rounded-[1.35rem]">
-      <div className="flex items-center justify-between border-b border-[var(--stroke)] bg-[linear-gradient(180deg,#ffffff,rgba(230,242,240,0.55))] px-4 py-3.5">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--stroke)] bg-[linear-gradient(180deg,#ffffff,rgba(230,242,240,0.55))] px-4 py-3.5">
         <div>
           <div className="flex items-center gap-2">
             <span className="live-pulse inline-block h-2 w-2 rounded-full bg-[var(--accent)]" />
@@ -92,11 +125,21 @@ export function ChatPanel(props: {
           </div>
           <p className="mt-0.5 text-xs text-[var(--muted)]">{t.chat.subtitle}</p>
         </div>
-        {provider ? (
-          <span className="rounded-full bg-[var(--chip)] px-2.5 py-1 text-[11px] font-medium text-[var(--muted)]">
-            {provider === "gemini" ? "Gemini" : t.chat.localMode}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {provider ? (
+            <span className="rounded-full bg-[var(--chip)] px-2.5 py-1 text-[11px] font-medium text-[var(--muted)]">
+              {provider === "gemini" ? "Gemini" : t.chat.localMode}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void resetChat()}
+            disabled={busy}
+            className="rounded-lg border border-[var(--stroke)] bg-white px-2.5 py-1 text-[11px] text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+          >
+            {t.chat.reset}
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">

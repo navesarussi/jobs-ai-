@@ -36,6 +36,9 @@ export const en = {
     demoEmployeeDev: "Employee demo (dev only)",
     demoEmployerDev: "Employer demo (dev only)",
     adminPortal: "Admin portal",
+    openAuthHint: "Google sign-in is paused — pick a role to start chatting.",
+    openingRole: "Opening your screen…",
+    realUsersTitleOpen: "Choose how you want to continue",
   },
   session: {
     noActiveSession: "No active session.",
@@ -59,6 +62,11 @@ export const en = {
     reportBody: "Describe the problem:",
     rateSubject: "Shidukh — app rating",
     rateBody: "My rating",
+    defaultRole: "Default role",
+    roleEmployee: "Job seeker",
+    roleEmployer: "Employer",
+    roleClear: "Ask each time on home",
+    adminPortal: "Admin portal",
   },
   legal: {
     privacyTitle: "Privacy policy",
@@ -85,6 +93,9 @@ export const en = {
     chatTab: "Chat",
     candidatesTab: "Candidates ({count})",
     chatPlaceholder: "e.g. Looking for a waiter for a restaurant in Tel Aviv…",
+    jobsFilter: "Jobs",
+    newJob: "New job",
+    jobFallback: "Job {n}",
   },
   chat: {
     title: "Chat with the agent",
@@ -97,6 +108,8 @@ export const en = {
     typing: "Agent is typing…",
     send: "Send",
     replyFailed: "Could not get a reply",
+    reset: "Reset chat",
+    resetConfirm: "Clear this conversation?",
   },
   profile: {
     yourCard: "Your profile",

@@ -1,4 +1,9 @@
 import { NotFoundError } from "@/domain/errors";
+import {
+  normalizeEmployerRecord,
+  updateJobSlot,
+  withActiveJob,
+} from "@/domain/employer-jobs";
 import type { StoreData } from "@/domain/types";
 import { refreshStoreMatches } from "@/application/employer-actions";
 
@@ -29,13 +34,16 @@ export function updateFlexibility(
     return refreshStoreMatches(next);
   }
 
-  const er = store.employers.find((e) => e.userId === userId);
-  if (!er) throw new NotFoundError("Employer");
+  const raw = store.employers.find((e) => e.userId === userId);
+  if (!raw) throw new NotFoundError("Employer");
+  const employer = normalizeEmployerRecord(raw);
+  const updated = updateJobSlot(employer, employer.activeJobId, {
+    card: { ...employer.card, flexibility: flex },
+  });
+  const mirrored = withActiveJob(updated, employer.activeJobId);
   const next: StoreData = {
     ...store,
-    employers: store.employers.map((e) =>
-      e.userId === userId ? { ...e, card: { ...e.card, flexibility: flex } } : e,
-    ),
+    employers: store.employers.map((e) => (e.userId === userId ? mirrored : e)),
   };
   return refreshStoreMatches(next);
 }
