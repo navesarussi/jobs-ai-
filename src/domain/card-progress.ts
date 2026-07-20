@@ -1,3 +1,4 @@
+import { cardValue, formatCardValue, mergeCardRows } from "@/domain/card-extras";
 import { CANDIDATE_FIELD_META, JOB_FIELD_META } from "@/domain/card-fields";
 import type { CandidateCard, JobCard } from "@/domain/types";
 
@@ -9,33 +10,26 @@ function isEmpty(value: unknown): boolean {
   return false;
 }
 
-function valueOf(card: object, key: string): unknown {
-  return (card as Record<string, unknown>)[key];
-}
-
-export function formatCardValue(value: unknown): string {
-  if (value == null) return "";
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "number") return String(value);
-  return String(value);
-}
+export { formatCardValue };
 
 export function candidateRows(card: CandidateCard, labels: Record<string, string> = {}) {
-  return CANDIDATE_FIELD_META.map((m) => ({
+  const core = CANDIDATE_FIELD_META.map((m) => ({
     key: m.key,
     label: labels[m.key] ?? m.key,
-    value: formatCardValue(valueOf(card, m.key)),
-    filled: !isEmpty(valueOf(card, m.key)),
+    value: formatCardValue(cardValue(card, m.key)),
+    filled: !isEmpty(cardValue(card, m.key)),
   }));
+  return mergeCardRows(core, card.extras);
 }
 
 export function jobRows(card: JobCard, labels: Record<string, string> = {}) {
-  return JOB_FIELD_META.map((m) => ({
+  const core = JOB_FIELD_META.map((m) => ({
     key: m.key,
     label: labels[m.key] ?? m.key,
-    value: formatCardValue(valueOf(card, m.key)),
-    filled: !isEmpty(valueOf(card, m.key)),
+    value: formatCardValue(cardValue(card, m.key)),
+    filled: !isEmpty(cardValue(card, m.key)),
   }));
+  return mergeCardRows(core, card.extras);
 }
 
 export function nextMissingCandidateField(card: CandidateCard) {
@@ -44,7 +38,7 @@ export function nextMissingCandidateField(card: CandidateCard) {
     if (m.key === "summary" || m.key === "flexibility" || m.key === "narrative") {
       continue;
     }
-    if (isEmpty(valueOf(card, m.key))) return m;
+    if (isEmpty(cardValue(card, m.key))) return m;
   }
   if (card.flexibility === 5) {
     return CANDIDATE_FIELD_META.find((m) => m.key === "flexibility")!;
@@ -58,7 +52,7 @@ export function nextMissingJobField(card: JobCard) {
     if (m.key === "summary" || m.key === "flexibility" || m.key === "narrative") {
       continue;
     }
-    if (isEmpty(valueOf(card, m.key))) return m;
+    if (isEmpty(cardValue(card, m.key))) return m;
   }
   if (card.flexibility === 5) {
     return JOB_FIELD_META.find((m) => m.key === "flexibility")!;
