@@ -9,7 +9,7 @@ export async function GET() {
     const supabase = getSupabaseConfig();
     const derivedUrl = deriveSupabaseUrlFromDatabaseUrl(process.env.DATABASE_URL);
     await ensureSchema();
-    const pool = getPool();
+    const pool = await getPool();
     const result = await pool.query<{ now: Date }>(`select now()`);
     return ok({
       postgres: true,

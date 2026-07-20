@@ -34,7 +34,7 @@ function normalizeStore(raw: StoreData): StoreData {
 }
 
 async function readLegacyBlob(): Promise<StoreData | null> {
-  const pool = getPool();
+  const pool = await getPool();
   const result = await pool.query<{ data: StoreData }>(
     `select data from app_store where id = 'main' limit 1`,
   );
@@ -265,7 +265,7 @@ function seedStore(): StoreData {
 
 export async function readNormalizedStore(): Promise<StoreData> {
   await ensureSchema();
-  const pool = getPool();
+  const pool = await getPool();
   const client = await pool.connect();
   try {
     if (!(await hasNormalizedData())) {
@@ -293,7 +293,7 @@ export async function readNormalizedStore(): Promise<StoreData> {
 
 export async function writeNormalizedStore(store: StoreData): Promise<void> {
   await ensureSchema();
-  const pool = getPool();
+  const pool = await getPool();
   const client = await pool.connect();
   try {
     await client.query("begin");
