@@ -168,6 +168,7 @@ export const en = {
     pendingQuestions: "{count} field questions are waiting in the chat",
     emptyValue: "—",
     flexibilityValue: "{value}/10",
+    flexibilityDrag: "Drag",
     miniCardHint: "A short preview of your profile — not every internal detail.",
     miniCardEmpty: "Not enough details yet — continue in chat after uploading your CV.",
   },

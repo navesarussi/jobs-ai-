@@ -44,6 +44,7 @@ function MetricBar(props: {
 function FlexibilityBar(props: {
   userId: string;
   label: string;
+  dragHint: string;
   valueLabel: string;
   value: number;
   onChange: (value: number) => void;
@@ -89,19 +90,26 @@ function FlexibilityBar(props: {
 
   return (
     <div
-      className="relative min-w-0 flex-1"
+      className="flex-bar-wrap relative min-w-0 flex-1 rounded-lg border border-[var(--stroke)] bg-[color-mix(in_srgb,var(--chip)_55%,transparent)] px-2 py-1.5 transition duration-150 hover:border-[color-mix(in_srgb,var(--sky)_45%,var(--stroke))] hover:bg-[color-mix(in_srgb,var(--chip)_80%,transparent)]"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <div className="mb-1 flex items-center justify-between gap-2 text-[10px] text-[var(--muted)]">
-        <span className="truncate">{props.label}</span>
-        <span className="shrink-0 font-medium text-[var(--ink)]">{props.valueLabel}</span>
+      <div className="mb-1.5 flex items-center justify-between gap-2 text-[10px] text-[var(--muted)]">
+        <span className="flex min-w-0 items-center gap-1.5 truncate">
+          <span className="truncate">{props.label}</span>
+          <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-1.5 py-px text-[9px] font-medium text-[var(--sky)]">
+            <span aria-hidden className="tracking-tighter">
+              ⋮⋮
+            </span>
+            {props.dragHint}
+          </span>
+        </span>
+        <span className="shrink-0 font-semibold text-[var(--ink)]">{props.valueLabel}</span>
       </div>
-      <div className="relative h-1.5 cursor-pointer rounded-full bg-[var(--chip)]">
-        <div
-          className="pointer-events-none absolute inset-y-0 start-0 rounded-full bg-[var(--sky)] transition-[width] duration-150"
-          style={{ width: `${percent}%` }}
-        />
+      <div className="relative h-5">
+        <div className="flex-bar-track" aria-hidden>
+          <div className="flex-bar-fill" style={{ width: `${percent}%` }} />
+        </div>
         <input
           type="range"
           min={1}
@@ -115,7 +123,7 @@ function FlexibilityBar(props: {
             props.onChange(next);
             scheduleSave(next);
           }}
-          className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent opacity-0"
+          className="flex-bar-slider absolute inset-0 z-10"
         />
       </div>
     </div>
@@ -167,6 +175,7 @@ export function CandidateProfileStrip(props: {
           <FlexibilityBar
             userId={props.userId}
             label={t.profile.flexibility}
+            dragHint={t.profile.flexibilityDrag}
             valueLabel={fmtFlex(t.profile.flexibilityValue, flex)}
             value={flex}
             onChange={onFlex}
