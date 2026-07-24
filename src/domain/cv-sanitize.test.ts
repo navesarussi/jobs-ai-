@@ -19,8 +19,9 @@ describe("cv-sanitize", () => {
       patch: { narrative: "focus pathways correctly ".repeat(40), desiredRole: "Engineer" },
       unmappedFacts: [{ label: "x", value: "cleanly overall ".repeat(30) }],
     });
-    assert.ok(!out.patch.narrative || out.patch.narrative.length <= 400);
-    assert.ok(!(out.patch.narrative ?? "").includes("focus pathways correctly focus pathways"));
+    const narrative = String(out.patch.narrative ?? "");
+    assert.ok(narrative.length <= 400);
+    assert.ok(!narrative.includes("focus pathways correctly focus pathways"));
     assert.equal(out.patch.desiredRole, "Engineer");
   });
 });

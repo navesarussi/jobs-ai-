@@ -10,13 +10,14 @@ import { heuristicEmployeeIntake, heuristicEmployerIntake } from "./heuristic";
 import { buildEmployeeConversation, buildEmployerConversation } from "./prompts";
 import {
   candidatePatchSchema,
-  cvExtractionSchema,
   jobPatchSchema,
   type AiTokenUsage,
   type CandidatePatch,
   type IntakeResult,
   type JobPatch,
 } from "./schemas";
+
+export { runCvExtraction } from "./cv-extraction";
 
 function extractUsage(usage?: {
   promptTokens?: number;
@@ -43,6 +44,8 @@ export async function runEmployeeIntake(params: {
   pendingQuestions: FieldQuestion[];
   systemPrompt: string;
   pendingConflicts?: string;
+  pendingInferences?: string;
+  openReliabilityNotes?: string;
 }): Promise<IntakeResult> {
   if (!hasGeminiKey()) {
     return heuristicEmployeeIntake(
@@ -61,6 +64,8 @@ export async function runEmployeeIntake(params: {
       chat: params.chat,
       pendingQuestions: params.pendingQuestions,
       pendingConflicts: params.pendingConflicts,
+      pendingInferences: params.pendingInferences,
+      openReliabilityNotes: params.openReliabilityNotes,
     });
 
     const { object, usage } = await callGeminiWithRetry(() =>
@@ -149,65 +154,6 @@ export type CardExtraction<P> = {
   provider: "gemini" | "heuristic";
   usage?: AiTokenUsage;
 };
-
-const CV_EXTRACTION_SYSTEM = `את/ה מגייס/ת מקצועית שמנתחת קורות חיים לעומק ומדייקת לכרטיס מועמד/ת.
-כללים מחייבים:
-1. חלץ/י אך ורק מידע שמופיע במפורש בטקסט. אל תמציא/י, אל תנחש/י, אל תשלימ/י פערי ניסיון.
-2. מלא/י כמה שיותר שדות רלוונטיים ב-patch (תפקיד, תחום, מיקום, כישורים, שפות, השכלה, הסמכות, רישיונות, ניסיון, קישורים וכו').
-3. בנה/י workHistory מלאה לכל תפקיד (חברה, תפקיד, תאריכים אם יש, תיאור/הישגים).
-4. בנה/י educationHistory לכל מוסד/תואר/קורס משמעותי.
-5. כל פרט מפורש שלא נכנס לשדה קבוע — העבר/י ל-unmappedFacts (label+value). אסור לאבד מידע.
-6. narrative = סיכום מקצועי קצר של הרקע בלבד (לא העתקת כל הקורות חיים).
-7. fieldConfidence: סמן/י high/medium/low לשדות עמומים.
-8. שדה שלא מופיע — אל תכלול/י אותו ב-patch.
-החזר/י JSON לפי הסכמה בלבד.`;
-
-/** Extract candidate card fields + histories from raw CV / résumé text. */
-export async function runCvExtraction(params: {
-  text: string;
-  card: CandidateCard;
-}): Promise<
-  CardExtraction<CandidatePatch> & {
-    workHistory?: import("@/domain/types").WorkHistoryEntry[];
-    educationHistory?: import("@/domain/types").EducationHistoryEntry[];
-    unmappedFacts?: import("@/domain/types").UnmappedFact[];
-    fieldConfidence?: Record<string, "high" | "medium" | "low">;
-  }
-> {
-  if (!hasGeminiKey()) {
-    const h = heuristicEmployeeIntake(params.text, params.card, [], []);
-    return { patch: h.candidatePatch ?? {}, provider: "heuristic" };
-  }
-  try {
-    const { object, usage } = await callGeminiWithRetry(() =>
-      generateObject({
-        model: getGeminiModel(),
-        temperature: 0.15,
-        schema: cvExtractionSchema,
-        system: CV_EXTRACTION_SYSTEM,
-        messages: [
-          {
-            role: "user",
-            content: `קורות חיים לניתוח מעמיק:\n\n${params.text}\n\nכרטיס נוכחי (למודעות בלבד; מיזוג יטופל בשרת):\n${JSON.stringify(params.card)}`,
-          },
-        ],
-      }),
-    );
-    return {
-      patch: object.patch,
-      workHistory: object.workHistory,
-      educationHistory: object.educationHistory,
-      unmappedFacts: object.unmappedFacts,
-      fieldConfidence: object.fieldConfidence,
-      provider: "gemini",
-      usage: extractUsage(usage),
-    };
-  } catch (err) {
-    console.error("cv extraction Gemini failed, using heuristic", err);
-    const h = heuristicEmployeeIntake(params.text, params.card, [], []);
-    return { patch: h.candidatePatch ?? {}, provider: "heuristic" };
-  }
-}
 
 const JOB_EXTRACTION_SYSTEM = `את/ה עוזר/ת השמה שמחלץ/ת מידע מתיאור משרה אל כרטיס משרה.
 - חלץ/י אך ורק מה שמופיע במפורש בטקסט. אל תמציא/י ואל תנחש/י.

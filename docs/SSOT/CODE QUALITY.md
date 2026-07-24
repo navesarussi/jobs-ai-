@@ -31,6 +31,7 @@ Architecture: Domain ← Application ← Infrastructure / App.
 - Schema bootstrap: additive `ALTER`s (incl. `conversation_context`) run after `CREATE TABLE IF NOT EXISTS`; context index lives in ALTERS so existing DBs migrate without failing on missing columns
 - [PENDING REFACTOR]: split `SettingsMenu.tsx` under 200-line cap
 - [PENDING REFACTOR]: split `domain/cv-merge.ts` under 200-line cap
+- [PENDING REFACTOR]: split `application/chat.ts` under 200-line cap after CV reliability work
 - [PENDING REFACTOR]: during CV subtext work, prefer new files (`cv-sanitize.ts`, `reliability.ts`, `cv-extraction.ts`) over growing `intake.ts` / `cv-merge.ts` further
 - Settings sign-out clears `shidukh_user` + NextAuth session (when present) and returns to `/`
 - [PENDING REFACTOR]: restore employer/admin UI entry points (home role picker, settings default-role, admin menu) after candidate CITOV rebrand phase

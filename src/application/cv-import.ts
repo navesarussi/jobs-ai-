@@ -3,7 +3,7 @@ import { applyCvExtraction } from "@/application/chat";
 import { createAiUsageRecord } from "@/domain/admin";
 import { NotFoundError } from "@/domain/errors";
 import { emptyCvProfile, type CandidateDocument, type StoreData } from "@/domain/types";
-import { runCvExtraction } from "@/infrastructure/ai/intake";
+import { runCvExtraction } from "@/infrastructure/ai/cv-extraction";
 
 export type SaveCvInput = {
   userId: string;
@@ -73,9 +73,41 @@ export async function analyzeCandidateCv(
   if (!document) throw new NotFoundError("CV document");
 
   const extracted = await runCvExtraction({ text: document.extractedText, card: emp.card });
+
+  if (extracted.failed) {
+    const failedDoc: CandidateDocument = { ...document, extractionStatus: "failed" };
+    const cv = emp.cv ?? emptyCvProfile();
+    const nextCv = {
+      ...cv,
+      documents: [...cv.documents.filter((d) => d.id !== failedDoc.id), failedDoc],
+    };
+    return {
+      store: {
+        ...store,
+        employees: store.employees.map((e) =>
+          e.userId === userId ? { ...e, cv: nextCv } : e,
+        ),
+      },
+      provider: extracted.provider,
+      summary: {
+        fieldsUpdated: 0,
+        rolesFound: 0,
+        educationFound: 0,
+        conflictsPending: 0,
+        unmappedCount: 0,
+        fileName: document.fileName,
+      },
+      documentId: document.id,
+    };
+  }
+
+  const status =
+    extracted.provider === "heuristic" || (extracted.strippedCount ?? 0) > 0
+      ? "partial"
+      : "ok";
   const analyzedDoc: CandidateDocument = {
     ...document,
-    extractionStatus: extracted.provider === "heuristic" ? "partial" : "ok",
+    extractionStatus: status,
   };
 
   const applied = applyCvExtraction(
@@ -87,6 +119,7 @@ export async function analyzeCandidateCv(
       educationHistory: extracted.educationHistory,
       unmappedFacts: extracted.unmappedFacts,
       fieldConfidence: extracted.fieldConfidence,
+      inferences: extracted.inferences,
     },
     analyzedDoc,
   );

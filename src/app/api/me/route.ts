@@ -31,6 +31,7 @@ export async function GET(req: Request) {
         cvFileName: latestCv?.fileName ?? null,
         cvExtractionStatus: latestCv?.extractionStatus ?? null,
         aiMode: hasGeminiKey() ? "gemini" : "heuristic",
+        // FR-CV-09: never expose reliability / pendingInferences to candidates
       });
     }
     const raw = store.employers.find((e) => e.userId === userId);

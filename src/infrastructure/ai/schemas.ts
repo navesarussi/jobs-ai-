@@ -85,6 +85,13 @@ export const unmappedFactSchema = z.object({
   confidence: confidenceSchema,
 });
 
+export const cvInferenceSchema = z.object({
+  fieldKey: z.string(),
+  value: z.string(),
+  evidence: z.string(),
+  confidence: z.enum(["high", "medium", "low"]),
+});
+
 /** Deep CV extraction payload (patch + structured histories + leftovers). */
 export const cvExtractionSchema = z.object({
   patch: candidatePatchSchema,
@@ -92,9 +99,15 @@ export const cvExtractionSchema = z.object({
   educationHistory: z.array(educationHistoryEntrySchema).optional(),
   unmappedFacts: z.array(unmappedFactSchema).optional(),
   fieldConfidence: z.record(z.string(), z.enum(["high", "medium", "low"])).optional(),
+  inferences: z.array(cvInferenceSchema).optional(),
+});
+
+export const cvInferencePassSchema = z.object({
+  inferences: z.array(cvInferenceSchema).default([]),
 });
 
 export type CvExtractionPayload = z.infer<typeof cvExtractionSchema>;
+export type CvInferencePayload = z.infer<typeof cvInferenceSchema>;
 
 export const jobPatchSchema = z.object({
   summary: optStr,

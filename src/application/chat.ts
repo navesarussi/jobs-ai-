@@ -12,9 +12,13 @@ import {
   unansweredQuestionsForCandidate,
 } from "@/domain/field-questions";
 import {
+  formatOpenReliabilityNotesForPrompt,
   formatPendingConflictsForPrompt,
+  formatPendingInferencesForPrompt,
   mergeCvIntoEmployee,
+  openChatConflictOnCard,
   resolveConflictsFromPatch,
+  resolvePendingInferencesFromPatch,
   type CvImportSummary,
   type CvPatchInput,
 } from "@/domain/cv-merge";
@@ -28,23 +32,97 @@ import type {
   JobCard,
   StoreData,
 } from "@/domain/types";
+import { emptyCvProfile } from "@/domain/types";
 import { runEmployeeIntake, runEmployerIntake } from "@/infrastructure/ai/intake";
 import { resolveAdminSettings } from "@/infrastructure/ai/prompts";
 import type { AiTokenUsage, CandidatePatch, JobPatch } from "@/infrastructure/ai/schemas";
 
-function applyCandidatePatch(card: CandidateCard, patch?: CandidatePatch): CandidateCard {
-  if (!patch) return card;
+function isEmptyCardValue(v: unknown): boolean {
+  if (v == null) return true;
+  if (typeof v === "string") return v.trim() === "";
+  if (typeof v === "number") return false;
+  if (Array.isArray(v)) return v.length === 0;
+  return false;
+}
+
+function norm(v: unknown): string {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.map(String).join(", ");
+  return String(v).trim();
+}
+
+function ensureCv(cv?: CandidateCvProfile): CandidateCvProfile {
+  const base = emptyCvProfile();
+  if (!cv) return base;
   return {
-    ...card,
-    ...patch,
-    skills: patch.skills ?? card.skills,
-    softSkills: patch.softSkills ?? card.softSkills,
-    languages: patch.languages ?? card.languages,
-    extras: { ...card.extras, ...(patch.extras ?? {}) },
-    flexibility: card.flexibility,
-    experienceYears:
-      patch.experienceYears !== undefined ? patch.experienceYears : card.experienceYears,
+    ...base,
+    ...cv,
+    workHistory: cv.workHistory ?? [],
+    educationHistory: cv.educationHistory ?? [],
+    unmappedFacts: cv.unmappedFacts ?? [],
+    fieldEvidence: cv.fieldEvidence ?? [],
+    conflicts: cv.conflicts ?? [],
+    documents: cv.documents ?? [],
+    pendingInferences: cv.pendingInferences ?? [],
+    reliability: cv.reliability ?? base.reliability,
   };
+}
+
+/** Fill empty / same values; open chat_internal conflict on differing non-empty values. */
+function applyCandidatePatchSafely(
+  card: CandidateCard,
+  cv: CandidateCvProfile | undefined,
+  patch?: CandidatePatch,
+  now = new Date().toISOString(),
+): { card: CandidateCard; cv: CandidateCvProfile | undefined } {
+  if (!patch) return { card, cv: cv ? ensureCv(cv) : cv };
+  let nextCard = {
+    ...card,
+    workHistory: card.workHistory ?? [],
+    educationHistory: card.educationHistory ?? [],
+  };
+  let nextCv = cv ? ensureCv(cv) : undefined;
+  const skip = new Set(["flexibility", "workHistory", "educationHistory"]);
+
+  for (const [key, raw] of Object.entries(patch)) {
+    if (raw === undefined || skip.has(key)) continue;
+    if (key === "skills" || key === "softSkills" || key === "languages") {
+      const incoming = raw as string[];
+      if (!incoming?.length) continue;
+      const prev = (nextCard[key as "skills"] as string[]) ?? [];
+      const seen = new Set(prev.map((s) => s.toLowerCase()));
+      const merged = [...prev];
+      for (const item of incoming) {
+        if (!item.trim() || seen.has(item.toLowerCase())) continue;
+        seen.add(item.toLowerCase());
+        merged.push(item);
+      }
+      nextCard = { ...nextCard, [key]: merged };
+      continue;
+    }
+    if (key === "extras" && raw && typeof raw === "object") {
+      nextCard = {
+        ...nextCard,
+        extras: { ...nextCard.extras, ...(raw as Record<string, string>) },
+      };
+      continue;
+    }
+    const prevVal = (nextCard as Record<string, unknown>)[key];
+    if (isEmptyCardValue(prevVal)) {
+      nextCard = { ...nextCard, [key]: raw } as CandidateCard;
+      continue;
+    }
+    if (norm(prevVal) === norm(raw)) continue;
+    nextCv = openChatConflictOnCard(
+      nextCv ?? emptyCvProfile(),
+      key,
+      norm(prevVal),
+      norm(raw),
+      now,
+    );
+  }
+
+  return { card: nextCard, cv: nextCv };
 }
 
 function applyJobPatch(card: JobCard, patch?: JobPatch): JobCard {
@@ -122,10 +200,43 @@ export async function handleEmployeeChat(
     pendingQuestions: pending,
     systemPrompt: prompts.candidatePrompt,
     pendingConflicts: formatPendingConflictsForPrompt(emp.cv),
+    pendingInferences: formatPendingInferencesForPrompt(emp.cv),
+    openReliabilityNotes: formatOpenReliabilityNotesForPrompt(emp.cv),
   });
 
-  let card = applyCandidatePatch(emp.card, intake.candidatePatch);
-  const cv = resolveConflictsFromPatch(emp.cv, intake.candidatePatch ?? {});
+  // Resolve pre-existing conflicts / inferences before opening new ones
+  let cv =
+    resolvePendingInferencesFromPatch(
+      resolveConflictsFromPatch(emp.cv, intake.candidatePatch ?? {}),
+      intake.candidatePatch ?? {},
+    ) ?? emp.cv;
+
+  let card = { ...emp.card };
+  for (const c of cv?.conflicts ?? []) {
+    if (c.status === "resolved" && c.resolvedValue) {
+      const wasPending = emp.cv?.conflicts.some(
+        (x) => x.id === c.id && x.status === "pending",
+      );
+      if (wasPending) {
+        card = { ...card, [c.fieldKey]: c.resolvedValue } as CandidateCard;
+      }
+    }
+  }
+  for (const p of cv?.pendingInferences ?? []) {
+    if (p.status === "accepted") {
+      const wasPending = emp.cv?.pendingInferences.some(
+        (x) => x.id === p.id && x.status === "pending",
+      );
+      if (wasPending && isEmptyCardValue((card as Record<string, unknown>)[p.fieldKey])) {
+        card = { ...card, [p.fieldKey]: p.value } as CandidateCard;
+      }
+    }
+  }
+
+  const applied = applyCandidatePatchSafely(card, cv, intake.candidatePatch);
+  card = applied.card;
+  cv = applied.cv;
+
   let answers = store.fieldAnswers;
   let pendingIds = emp.pendingFieldQuestionIds;
   const newFieldAnswers: FieldAnswer[] = [];

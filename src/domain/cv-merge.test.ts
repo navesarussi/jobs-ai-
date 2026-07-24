@@ -152,3 +152,20 @@ describe("resolveConflictsFromPatch", () => {
     assert.equal(cv?.reliability.score, 100);
   });
 });
+
+describe("openChatConflictOnCard", () => {
+  it("opens chat_internal note and lowers reliability", async () => {
+    const { openChatConflictOnCard } = await import("./cv-merge");
+    const cv = openChatConflictOnCard(
+      emptyCvProfile(),
+      "location",
+      "תל אביב",
+      "חיפה",
+      "2026-07-24T00:00:00.000Z",
+    );
+    assert.equal(cv.conflicts.length, 1);
+    assert.equal(cv.conflicts[0]?.status, "pending");
+    assert.ok(cv.reliability.score < 100);
+    assert.ok(cv.reliability.notes.some((n) => n.kind === "chat_internal"));
+  });
+});

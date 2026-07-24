@@ -22,6 +22,11 @@ type AdminStats = {
     estimatedCostUsd: number;
   };
   users: number;
+  reliability?: {
+    averageScore: number;
+    openNotes: number;
+    lowScoreCandidates: { userId: string; name: string; score: number; openNotes: number }[];
+  };
 };
 
 type Dashboard = {
@@ -214,6 +219,29 @@ export default function AdminPage() {
           <span>נדחו: {stats.matches.rejected}</span>
           <span>משתמשים רשומים: {stats.users}</span>
         </div>
+      </section>
+
+      <section className="panel enter-delay-2 mt-4 rounded-[var(--panel-radius)] p-5">
+        <h2 className="text-sm font-semibold text-[var(--muted)]">אמינות מועמדים (פנימי)</h2>
+        <div className="mt-2 flex flex-wrap gap-4 text-sm">
+          <span>ממוצע: {stats.reliability?.averageScore ?? 100}</span>
+          <span>סתירות פתוחות: {stats.reliability?.openNotes ?? 0}</span>
+        </div>
+        {(stats.reliability?.lowScoreCandidates?.length ?? 0) > 0 ? (
+          <ul className="mt-3 space-y-1.5 text-xs text-[var(--ink)]">
+            {stats.reliability!.lowScoreCandidates.map((c) => (
+              <li key={c.userId} className="flex flex-wrap gap-2">
+                <span className="font-medium">{c.name}</span>
+                <span className="text-[var(--muted)]">ציון {c.score}</span>
+                {c.openNotes > 0 ? (
+                  <span className="text-[var(--warn)]">{c.openNotes} פתוחות</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-xs text-[var(--muted)]">אין סתירות פתוחות כרגע.</p>
+        )}
       </section>
 
       <section className="enter-delay-2 mt-8 space-y-6">
