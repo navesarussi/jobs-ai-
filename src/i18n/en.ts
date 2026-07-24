@@ -40,11 +40,11 @@ export const en = {
     openAuthHint: "Google sign-in is paused — start chatting as a candidate.",
     openingRole: "Opening your screen…",
     realUsersTitleOpen: "Choose how you want to continue",
-    devSignIn: "Sign in (dev)",
+    devSignIn: "Test sign-in (no Google)",
   },
   devLogin: {
     title: "Development sign-in",
-    hint: "Pick how to enter — no Google required in local dev.",
+    hint: "Pick how to enter — no Google required for internal testing.",
     admin: "Admin",
     existing: "Existing user",
     newUser: "New user",

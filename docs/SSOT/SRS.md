@@ -16,6 +16,7 @@ Match employers and candidates **without search**. Agents extract rich profiles 
 ### FR-AUTH
 - Google OAuth available when `GOOGLE_AUTH_ENABLED=true` and Google credentials are set
 - While Google is soft-disabled (`GOOGLE_AUTH_ENABLED` unset/false), open local sessions are allowed for chat development (Google code remains in the repo)
+- Test login dialog (no Google) available when `ALLOW_TEST_LOGIN=true` (production internal testing) or in local dev with open auth
 - Demo mode when `ALLOW_DEMO=true`
 - API actions must be authorized for the acting user (or open-dev actor when Google is soft-disabled)
 

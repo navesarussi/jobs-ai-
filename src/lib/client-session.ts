@@ -77,6 +77,28 @@ export function roleHomePath(role: Role): string {
   return role === "employee" ? "/employee" : "/employer";
 }
 
+export async function startRoleSession(role: Role): Promise<{
+  id: string;
+  name: string;
+  role: Role;
+}> {
+  const res = await fetch("/api/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, deviceId: getOrCreateDeviceId() }),
+  });
+  const data = (await res.json()) as {
+    error?: string;
+    user?: { id: string; name: string; role: Role };
+  };
+  if (!res.ok || data.error || !data.user) {
+    throw new Error(data.error ?? "Session failed");
+  }
+  writeStoredUser(data.user);
+  writeRoleDefault(role);
+  return data.user;
+}
+
 export function adminHomePath(): string {
   return "/admin";
 }

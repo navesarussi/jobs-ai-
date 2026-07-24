@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { isAdminEmail } from "@/infrastructure/admin-config";
-import { allowOpenAuth } from "@/infrastructure/auth-flags";
+import { allowOpenAuth, isTestLoginEnabled } from "@/infrastructure/auth-flags";
 
 export const DEV_SESSION_COOKIE = "citov_dev_session";
 export const DEV_ADMIN_EMAIL = "dev-admin@local.dev";
@@ -13,6 +13,7 @@ export type DevSession = {
 };
 
 export function isDevAuthEnabled(): boolean {
+  if (isTestLoginEnabled()) return true;
   return process.env.NODE_ENV === "development" && allowOpenAuth();
 }
 

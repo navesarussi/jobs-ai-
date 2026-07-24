@@ -42,11 +42,11 @@ export const he: Messages = {
     openAuthHint: "התחברות Google מושהית כרגע — התחילו לצ׳אט כמועמדים.",
     openingRole: "פותחים את המסך שלכם…",
     realUsersTitleOpen: "איך תרצו להמשיך?",
-    devSignIn: "כניסה (פיתוח)",
+    devSignIn: "כניסה לבדיקות (בלי Google)",
   },
   devLogin: {
     title: "כניסה לסביבת פיתוח",
-    hint: "בחרו איך להיכנס — בלי Google, לוקאלי בלבד.",
+    hint: "בחרו איך להיכנס — בלי Google, לבדיקות פנימיות.",
     admin: "מנהל/ת",
     existing: "משתמש/ת קיים/ה",
     newUser: "משתמש/ת חדש/ה",

@@ -15,6 +15,7 @@ import {
   consumeSkipAutoLogin,
   readStoredUser,
   roleHomePath,
+  startRoleSession,
 } from "@/lib/client-session";
 
 type DevUser = { id: string; name: string; role: Role; email?: string };
@@ -34,6 +35,7 @@ export default function HomePage() {
   const { t, fmt } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [entering, setEntering] = useState(false);
   const [flags, setFlags] = useState<SessionFlags>({
     googleAuth: false,
     allowDemo: false,
@@ -72,10 +74,10 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!flagsReady || autoStarted.current || flags.devAuth) return;
+    if (!flagsReady || autoStarted.current) return;
     if (consumeSkipAutoLogin()) return;
 
-    if (flags.isAdmin && status === "authenticated") {
+    if (flags.isAdmin && !flags.devAuth && status === "authenticated") {
       autoStarted.current = true;
       router.replace(adminHomePath());
       return;
@@ -101,14 +103,30 @@ export default function HomePage() {
     router.refresh();
   }
 
+  async function enterAsRole(role: Role) {
+    setError(null);
+    setEntering(true);
+    try {
+      await startRoleSession(role);
+      router.replace(roleHomePath(role));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.api.internalError);
+    } finally {
+      setEntering(false);
+    }
+  }
+
   function onDevLoginDone(redirect: string) {
     setLoginOpen(false);
     setError(null);
     router.replace(redirect);
   }
 
-  const isAdminUser = flags.isAdmin && !flags.devAuth && status === "authenticated";
-  const canEnter = !flags.devAuth && (flags.openAuth || (status === "authenticated" && session?.user));
+  const isAuthed = status === "authenticated" && Boolean(session?.user);
+  const isAdminUser = flags.isAdmin && !flags.devAuth && isAuthed;
+  const showTestLogin = flags.devAuth;
+  const showGoogle = flags.googleAuth && !isAuthed;
+  const showRoleEntry = flags.openAuth || isAuthed;
 
   return (
     <div className="atmosphere">
@@ -133,19 +151,7 @@ export default function HomePage() {
             </p>
           ) : null}
 
-          {flags.devAuth ? (
-            <div className="space-y-3">
-              <p className="text-center text-xs leading-5 text-[var(--muted)]">
-                {t.devLogin.hint}
-              </p>
-              <Button
-                onClick={() => setLoginOpen(true)}
-                className="cta-glow brand-gradient-bg w-full border-0 py-4 text-base hover:bg-transparent hover:brightness-105"
-              >
-                {t.home.devSignIn}
-              </Button>
-            </div>
-          ) : isAdminUser ? (
+          {isAdminUser ? (
             <div className="space-y-3">
               <p className="text-center text-sm text-[var(--muted)]">
                 {fmt(t.home.connectedAs, {
@@ -162,32 +168,71 @@ export default function HomePage() {
                 {t.home.signOut}
               </Button>
             </div>
-          ) : canEnter ? (
-            <div className="space-y-3">
-              <p className="text-center text-xs leading-5 text-[var(--muted)]">
-                {t.home.openAuthHint}
-              </p>
-              <Button
-                onClick={() => router.replace(roleHomePath("employee"))}
-                className="cta-glow brand-gradient-bg w-full border-0 py-4 text-base hover:bg-transparent hover:brightness-105"
-              >
-                {t.home.iAmEmployee}
-              </Button>
-            </div>
           ) : (
             <div className="space-y-3">
-              <Button
-                disabled={!flags.googleAuth || status === "loading"}
-                onClick={() =>
-                  void signIn("google", { callbackUrl: "/", prompt: "select_account" })
-                }
-                className="cta-glow w-full py-4 text-base"
-              >
-                {t.home.googleSignIn}
-              </Button>
-              <p className="text-center text-xs leading-5 text-[var(--muted)]">
-                {flags.googleAuth ? t.home.afterSignInHint : t.home.googleNotConfigured}
-              </p>
+              {showTestLogin ? (
+                <>
+                  <p className="text-center text-xs leading-5 text-[var(--muted)]">
+                    {t.devLogin.hint}
+                  </p>
+                  <Button
+                    onClick={() => setLoginOpen(true)}
+                    className="cta-glow brand-gradient-bg w-full border-0 py-4 text-base hover:bg-transparent hover:brightness-105"
+                  >
+                    {t.home.devSignIn}
+                  </Button>
+                </>
+              ) : null}
+
+              {showGoogle ? (
+                <>
+                  <Button
+                    disabled={status === "loading"}
+                    onClick={() =>
+                      void signIn("google", { callbackUrl: "/", prompt: "select_account" })
+                    }
+                    className="cta-glow w-full py-4 text-base"
+                  >
+                    {t.home.googleSignIn}
+                  </Button>
+                  <p className="text-center text-xs leading-5 text-[var(--muted)]">
+                    {t.home.afterSignInHint}
+                  </p>
+                </>
+              ) : null}
+
+              {showRoleEntry ? (
+                <>
+                  <p className="text-center text-xs leading-5 text-[var(--muted)]">
+                    {isAuthed
+                      ? t.home.realUsersTitleOpen
+                      : flags.openAuth
+                        ? t.home.openAuthHint
+                        : t.home.afterSignInHint}
+                  </p>
+                  <Button
+                    disabled={entering}
+                    onClick={() => void enterAsRole("employee")}
+                    className="cta-glow brand-gradient-bg w-full border-0 py-4 text-base hover:bg-transparent hover:brightness-105"
+                  >
+                    {entering ? t.home.openingRole : t.home.iAmEmployee}
+                  </Button>
+                  <Button
+                    disabled={entering}
+                    variant="secondary"
+                    onClick={() => void enterAsRole("employer")}
+                    className="w-full py-4 text-base"
+                  >
+                    {entering ? t.home.openingRole : t.home.iAmEmployer}
+                  </Button>
+                </>
+              ) : null}
+
+              {!showTestLogin && !showGoogle && !showRoleEntry ? (
+                <p className="text-center text-xs leading-5 text-[var(--muted)]">
+                  {t.home.googleNotConfigured}
+                </p>
+              ) : null}
             </div>
           )}
         </section>

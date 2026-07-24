@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/domain/*.test.ts src/application/*.test.ts src/infrastructure/**/*.test.ts src/infrastructure/ai/*.test.ts",
+    "test": "tsx --test src/domain/*.test.ts src/application/*.test.ts src/infrastructure/*.test.ts src/infrastructure/**/*.test.ts src/infrastructure/ai/*.test.ts",
     "set-gemini-env": "node scripts/set-vercel-gemini-env.mjs"
   },
   "dependencies": {

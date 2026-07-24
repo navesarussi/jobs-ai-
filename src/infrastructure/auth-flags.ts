@@ -3,6 +3,11 @@ export function isGoogleAuthEnabled(): boolean {
   return process.env.GOOGLE_AUTH_ENABLED === "true";
 }
 
+/** Production-safe test login (dev dialog) — set ALLOW_TEST_LOGIN=true on Vercel. */
+export function isTestLoginEnabled(): boolean {
+  return process.env.ALLOW_TEST_LOGIN === "true";
+}
+
 export function hasGoogleCredentials(): boolean {
   return Boolean(
     process.env.AUTH_GOOGLE_ID?.trim() && process.env.AUTH_GOOGLE_SECRET?.trim(),
