@@ -11,6 +11,12 @@ import { ensureSchema, hasNormalizedData } from "./schema";
 import { registerFieldQuestionDefinitions } from "./field-definitions";
 import { getPool } from "./pool";
 import {
+  getCachedStore,
+  invalidateStoreCache,
+  markNormalizedDataPresent,
+  setCachedStore,
+} from "./store-cache";
+import {
   createSeedStore,
   findMemoryUserByEmailOrGoogle,
   readMemoryStore,
@@ -430,6 +436,8 @@ export async function upsertSessionRole(user: User, role: Role): Promise<User> {
     }
     await client.query("commit");
     began = false;
+    invalidateStoreCache();
+    markNormalizedDataPresent();
     return nextUser;
   } catch (e) {
     if (began) await client.query("rollback");
@@ -472,6 +480,9 @@ export async function readNormalizedStore(): Promise<StoreData> {
   if (shouldUseMemoryStore()) {
     return readMemoryStore();
   }
+  const cached = getCachedStore();
+  if (cached) return cached;
+
   await ensureSchema();
   const pool = await getPool();
 
@@ -486,6 +497,8 @@ export async function readNormalizedStore(): Promise<StoreData> {
       await persistStore(client, seed);
       await client.query("commit");
       began = false;
+      markNormalizedDataPresent();
+      setCachedStore(seed);
       return seed;
     } catch (e) {
       if (began) await client.query("rollback");
@@ -495,12 +508,15 @@ export async function readNormalizedStore(): Promise<StoreData> {
     }
   }
 
-  return loadFromTables(pool);
+  const loaded = await loadFromTables(pool);
+  setCachedStore(loaded);
+  return loaded;
 }
 
 export async function writeNormalizedStore(store: StoreData): Promise<void> {
   if (shouldUseMemoryStore()) {
     writeMemoryStore(store);
+    invalidateStoreCache();
     return;
   }
   await ensureSchema();
@@ -513,6 +529,8 @@ export async function writeNormalizedStore(store: StoreData): Promise<void> {
     await persistStore(client, store);
     await client.query("commit");
     began = false;
+    markNormalizedDataPresent();
+    invalidateStoreCache();
   } catch (e) {
     if (began) await client.query("rollback");
     throw e;
@@ -526,6 +544,7 @@ export async function replaceMatches(matches: Match[]): Promise<void> {
   if (shouldUseMemoryStore()) {
     const data = readMemoryStore();
     writeMemoryStore({ ...data, matches });
+    invalidateStoreCache();
     return;
   }
   await ensureSchema();
@@ -545,6 +564,7 @@ export async function replaceMatches(matches: Match[]): Promise<void> {
     );
     await client.query("commit");
     began = false;
+    invalidateStoreCache();
   } catch (e) {
     if (began) await client.query("rollback");
     throw e;
@@ -558,6 +578,7 @@ export async function upsertAdminSettings(settings: AdminSettings): Promise<void
   if (shouldUseMemoryStore()) {
     const data = readMemoryStore();
     writeMemoryStore({ ...data, adminSettings: settings });
+    invalidateStoreCache();
     return;
   }
   await ensureSchema();
@@ -579,6 +600,7 @@ export async function upsertAdminSettings(settings: AdminSettings): Promise<void
       settings.promptBundleVersion ?? null,
     ],
   );
+  invalidateStoreCache();
 }
 
 export async function deleteAdminSettings(): Promise<void> {
@@ -586,9 +608,11 @@ export async function deleteAdminSettings(): Promise<void> {
     const data = readMemoryStore();
     const { adminSettings: _removed, ...rest } = data;
     writeMemoryStore(rest);
+    invalidateStoreCache();
     return;
   }
   await ensureSchema();
   const pool = await getPool();
   await pool.query(`delete from admin_settings where id = 'main'`);
+  invalidateStoreCache();
 }

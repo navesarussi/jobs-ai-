@@ -9,6 +9,12 @@ declare global {
   var __shidukhPgUrl: string | undefined;
 }
 
+function poolMax(): number {
+  const raw = Number(process.env.DB_POOL_MAX ?? 12);
+  if (!Number.isFinite(raw) || raw < 1) return 12;
+  return Math.min(Math.floor(raw), 20);
+}
+
 async function hostResolves(connectionString: string): Promise<boolean> {
   try {
     const { host } = parseDatabaseUrl(connectionString);
@@ -24,7 +30,7 @@ async function probeConnection(connectionString: string): Promise<string> {
     connectionString,
     ssl: { rejectUnauthorized: false },
     max: 1,
-    connectionTimeoutMillis: 2500,
+    connectionTimeoutMillis: 2000,
   });
   try {
     const client = await pool.connect();
@@ -46,11 +52,25 @@ async function resolveConnectionString(): Promise<string> {
   ];
   const candidates = [...new Set(ordered)];
 
+  // Fast path: try preferred/cached host first before sweeping every region.
+  const preferred = candidates[0];
+  if (preferred) {
+    try {
+      if (await hostResolves(preferred)) {
+        const hit = await probeConnection(preferred);
+        global.__shidukhPgUrl = hit;
+        return hit;
+      }
+    } catch {
+      // fall through to batched probe
+    }
+  }
+
   const dnsHits = await Promise.all(candidates.map(async (c) => ((await hostResolves(c)) ? c : null)));
   const reachable = dnsHits.filter((c): c is string => Boolean(c));
   const toTry = reachable.length > 0 ? reachable : candidates;
 
-  const batchSize = 6;
+  const batchSize = 4;
   let lastError = "unknown";
   for (let i = 0; i < toTry.length; i += batchSize) {
     const batch = toTry.slice(i, i + batchSize);
@@ -85,8 +105,11 @@ export async function getPool(): Promise<Pool> {
     global.__shidukhPg = new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false },
-      max: 3,
-      connectionTimeoutMillis: 10000,
+      // Sized for ~50 concurrent users across a few warm instances via Supavisor.
+      max: poolMax(),
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 8_000,
+      allowExitOnIdle: true,
     });
   }
   return global.__shidukhPg;

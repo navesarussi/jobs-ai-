@@ -1,10 +1,10 @@
 import { randomUUID } from "crypto";
 import { saveCandidateCv } from "@/application/cv-import";
 import { assertActor } from "@/infrastructure/auth-guard";
+import { persistEmployeeProfile } from "@/infrastructure/db/scoped-store";
 import { saveCandidateDocumentBlob } from "@/infrastructure/files/cv-storage";
 import { extractTextFromUpload, MAX_UPLOAD_BYTES } from "@/infrastructure/files/extract-text";
 import { ok, fail } from "@/infrastructure/http";
-import { writeStore } from "@/infrastructure/store";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -51,7 +51,15 @@ export async function POST(req: Request) {
       extractedText: text,
     });
 
-    await writeStore(saved.store);
+    const nextEmp = saved.store.employees.find((e) => e.userId === userId)!;
+    await persistEmployeeProfile({
+      store: saved.store,
+      userId,
+      card: nextEmp.card,
+      pendingFieldQuestionIds: nextEmp.pendingFieldQuestionIds,
+      cv: nextEmp.cv,
+    });
+
     return ok({
       ok: true,
       phase: "saved",

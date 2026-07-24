@@ -1,7 +1,8 @@
-import { approveMatch, askFieldQuestion, rejectMatch } from "@/application/employer-actions";
+import { askFieldQuestion } from "@/application/employer-actions";
 import { ok, fail } from "@/infrastructure/http";
 import { assertActor } from "@/infrastructure/auth-guard";
-import { writeStore } from "@/infrastructure/store";
+import { updateMatchStatus } from "@/infrastructure/db/scoped-store";
+import { readStore, writeStore } from "@/infrastructure/store";
 
 export async function POST(req: Request) {
   try {
@@ -16,17 +17,25 @@ export async function POST(req: Request) {
     }
     const gate = await assertActor(body.employerId);
     if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
-    let store = gate.store;
-    if (body.action === "approve") store = approveMatch(store, body.matchId);
-    else if (body.action === "reject") store = rejectMatch(store, body.matchId);
-    else {
-      store = askFieldQuestion(store, {
-        employerId: body.employerId,
+
+    if (body.action === "approve" || body.action === "reject") {
+      const updated = await updateMatchStatus({
         matchId: body.matchId,
-        question: body.question ?? "",
+        employerId: body.employerId,
+        status: body.action === "approve" ? "approved" : "rejected",
       });
+      if (!updated) return ok({ error: "התאמה לא נמצאה" }, { status: 404 });
+      return ok({ ok: true });
     }
-    await writeStore(store);
+
+    // Field questions touch many candidates in the same field — rare path, full read OK.
+    const store = await readStore();
+    const next = askFieldQuestion(store, {
+      employerId: body.employerId,
+      matchId: body.matchId,
+      question: body.question ?? "",
+    });
+    await writeStore(next);
     return ok({ ok: true });
   } catch (e) {
     return fail(e);

@@ -1,5 +1,6 @@
 import { getPool } from "./pool";
 import { NORMALIZED_SCHEMA_SQL } from "./schema-sql";
+import { isNormalizedDataCached, markNormalizedDataPresent } from "./store-cache";
 
 const MIGRATION_VERSION = "004_cv_profile";
 
@@ -80,9 +81,12 @@ export function ensureSchema(): Promise<void> {
 }
 
 export async function hasNormalizedData(): Promise<boolean> {
+  if (isNormalizedDataCached()) return true;
   const pool = await getPool();
   const result = await pool.query<{ count: string }>(
     `select count(*)::text as count from app_users`,
   );
-  return Number(result.rows[0]?.count ?? 0) > 0;
+  const present = Number(result.rows[0]?.count ?? 0) > 0;
+  if (present) markNormalizedDataPresent();
+  return present;
 }

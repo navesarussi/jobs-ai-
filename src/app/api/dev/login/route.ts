@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveDevLogin } from "@/application/dev-login";
+import { listDevUsers, resolveDevLogin } from "@/application/dev-login";
 import {
   clearDevSessionCookieHeader,
   devSessionCookieHeader,
@@ -23,18 +23,26 @@ export async function POST(req: Request) {
       deviceId?: string;
     };
 
-    const store = await readStore();
+    const mode =
+      body.mode === "admin" || body.mode === "existing" || body.mode === "new"
+        ? body.mode
+        : "new";
+
+    // Demo seed users + admin/new modes don't need a full-store load.
+    const seedIds = new Set(listDevUsers().map((u) => u.id));
+    const needsStore =
+      mode === "existing" && body.userId && !seedIds.has(body.userId.trim());
+    const knownUsers = needsStore ? (await readStore()).users : undefined;
+
     const result = resolveDevLogin(
       {
-        mode: body.mode === "admin" || body.mode === "existing" || body.mode === "new"
-          ? body.mode
-          : "new",
+        mode,
         role: body.role === "employer" ? "employer" : "employee",
         userId: body.userId,
         name: body.name,
         deviceId: body.deviceId,
       },
-      store.users,
+      knownUsers,
     );
 
     if (result.kind === "admin") {

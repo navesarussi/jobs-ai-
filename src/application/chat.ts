@@ -21,8 +21,10 @@ import {
 import type {
   AiUsageRecord,
   CandidateCard,
+  CandidateCvProfile,
   CandidateDocument,
   ChatMessage,
+  FieldAnswer,
   JobCard,
   StoreData,
 } from "@/domain/types";
@@ -58,37 +60,27 @@ function applyJobPatch(card: JobCard, patch?: JobPatch): JobCard {
   };
 }
 
-function pushChat(
-  chat: ChatMessage[],
-  role: "user" | "assistant",
-  content: string,
-): ChatMessage[] {
-  return [
-    ...chat,
-    {
-      id: randomUUID(),
-      role,
-      content,
-      createdAt: new Date().toISOString(),
-    },
-  ];
+function makeMessage(role: "user" | "assistant", content: string): ChatMessage {
+  return {
+    id: randomUUID(),
+    role,
+    content,
+    createdAt: new Date().toISOString(),
+  };
 }
 
-function recordAiUsage(
-  store: StoreData,
+function buildUsageRecord(
   type: AiUsageRecord["type"],
   usage?: AiTokenUsage,
-): StoreData {
-  if (!usage) return store;
-  const record = createAiUsageRecord({
+): AiUsageRecord | undefined {
+  if (!usage) return undefined;
+  return createAiUsageRecord({
     id: randomUUID(),
     type,
     promptTokens: usage.promptTokens,
     completionTokens: usage.completionTokens,
     createdAt: new Date().toISOString(),
   });
-  const nextUsage = [...(store.aiUsage ?? []), record].slice(-200);
-  return { ...store, aiUsage: nextUsage };
 }
 
 export type ChatTurnResult = {
@@ -100,6 +92,11 @@ export type ChatTurnResult = {
   chat: ChatMessage[];
   pendingQuestions: { id: string; question: string }[];
   jobId?: string;
+  /** Deltas for scoped persistence (avoid whole-DB rewrite). */
+  newMessages: ChatMessage[];
+  newFieldAnswers: FieldAnswer[];
+  usageRecord?: AiUsageRecord;
+  cv?: CandidateCvProfile;
 };
 
 export async function handleEmployeeChat(
@@ -131,28 +128,37 @@ export async function handleEmployeeChat(
   const cv = resolveConflictsFromPatch(emp.cv, intake.candidatePatch ?? {});
   let answers = store.fieldAnswers;
   let pendingIds = emp.pendingFieldQuestionIds;
+  const newFieldAnswers: FieldAnswer[] = [];
 
   for (const fa of intake.fieldAnswers ?? []) {
     const q = store.fieldQuestions.find((x) => x.id === fa.questionId);
     if (!q) continue;
     card = mergeAnswerIntoCard(card, q, fa.answer);
+    const answer: FieldAnswer = {
+      questionId: fa.questionId,
+      candidateId: userId,
+      answer: fa.answer,
+      answeredAt: new Date().toISOString(),
+    };
     answers = [
       ...answers.filter(
         (a) => !(a.questionId === fa.questionId && a.candidateId === userId),
       ),
-      {
-        questionId: fa.questionId,
-        candidateId: userId,
-        answer: fa.answer,
-        answeredAt: new Date().toISOString(),
-      },
+      answer,
     ];
+    newFieldAnswers.push(answer);
     pendingIds = pendingIds.filter((id) => id !== fa.questionId);
   }
 
-  let next: StoreData = {
+  const newMessages = [makeMessage("user", message), makeMessage("assistant", intake.reply)];
+  const usageRecord = buildUsageRecord("employee_intake", intake.usage);
+
+  const next: StoreData = {
     ...store,
     fieldAnswers: answers,
+    aiUsage: usageRecord
+      ? [...(store.aiUsage ?? []), usageRecord].slice(-200)
+      : store.aiUsage,
     employees: store.employees.map((e) =>
       e.userId === userId
         ? {
@@ -160,12 +166,11 @@ export async function handleEmployeeChat(
             card,
             cv,
             pendingFieldQuestionIds: pendingIds,
-            chat: pushChat(pushChat(e.chat, "user", message), "assistant", intake.reply),
+            chat: [...e.chat, ...newMessages],
           }
         : e,
     ),
   };
-  next = recordAiUsage(next, "employee_intake", intake.usage);
   const empNext = next.employees.find((e) => e.userId === userId)!;
   const pendingOut = next.fieldQuestions.filter((q) =>
     empNext.pendingFieldQuestionIds.includes(q.id),
@@ -178,6 +183,10 @@ export async function handleEmployeeChat(
     card: empNext.card,
     chat: empNext.chat,
     pendingQuestions: pendingOut.map((q) => ({ id: q.id, question: q.question })),
+    newMessages,
+    newFieldAnswers,
+    usageRecord,
+    cv,
   };
 }
 
@@ -203,15 +212,19 @@ export async function handleEmployerChat(
   });
 
   const card = applyJobPatch(active.card, intake.jobPatch);
-  const chat = pushChat(pushChat(active.chat, "user", message), "assistant", intake.reply);
+  const newMessages = [makeMessage("user", message), makeMessage("assistant", intake.reply)];
+  const chat = [...active.chat, ...newMessages];
   const updated = updateJobSlot(employer, active.id, { card, chat });
   const mirrored = withActiveJob(updated, active.id);
+  const usageRecord = buildUsageRecord("employer_intake", intake.usage);
 
-  let next: StoreData = {
+  const next: StoreData = {
     ...store,
+    aiUsage: usageRecord
+      ? [...(store.aiUsage ?? []), usageRecord].slice(-200)
+      : store.aiUsage,
     employers: store.employers.map((e) => (e.userId === userId ? mirrored : e)),
   };
-  next = recordAiUsage(next, "employer_intake", intake.usage);
   return {
     store: next,
     reply: intake.reply,
@@ -221,6 +234,9 @@ export async function handleEmployerChat(
     chat,
     pendingQuestions: [],
     jobId: active.id,
+    newMessages,
+    newFieldAnswers: [],
+    usageRecord,
   };
 }
 

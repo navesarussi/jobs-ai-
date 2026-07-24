@@ -4,12 +4,12 @@ import type { Role, User } from "@/domain/types";
 import { ok, fail } from "@/infrastructure/http";
 import { allowOpenAuth } from "@/infrastructure/auth-flags";
 import { allowDemo } from "@/infrastructure/auth-guard";
+import { createSeedStore } from "@/infrastructure/db/memory-store";
 import {
   findUserByEmailOrGoogle,
   upsertSessionRole,
 } from "@/infrastructure/db/normalized-store";
 import { getSessionFlags } from "@/lib/session-flags-server";
-import { readStore } from "@/infrastructure/store";
 
 export async function GET() {
   return ok(await getSessionFlags());
@@ -29,9 +29,14 @@ export async function POST(req: Request) {
       if (!allowDemo()) {
         return ok({ error: "מצב דמו כבוי. התחברו עם Google." }, { status: 403 });
       }
-      const store = await readStore();
+      // Avoid a full-store read just to return a known seed user.
       const demoId = role === "employee" ? "demo-employee" : "demo-employer";
-      return ok({ user: store.users.find((u) => u.id === demoId) });
+      const seedUser = createSeedStore().users.find((u) => u.id === demoId);
+      if (!seedUser) {
+        return ok({ error: "משתמש דמו לא נמצא" }, { status: 404 });
+      }
+      const user = await upsertSessionRole(seedUser, role);
+      return ok({ user });
     }
 
     if (allowOpenAuth()) {

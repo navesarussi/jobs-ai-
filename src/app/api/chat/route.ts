@@ -1,10 +1,15 @@
 import { after } from "next/server";
 import { handleEmployeeChat, handleEmployerChat } from "@/application/chat";
-import { refreshStoreMatches } from "@/application/employer-actions";
 import { employeeHasCv } from "@/domain/candidate-mini-card";
+import { normalizeEmployerRecord } from "@/domain/employer-jobs";
+import type { CandidateCard } from "@/domain/types";
 import { ok, fail } from "@/infrastructure/http";
 import { assertActor } from "@/infrastructure/auth-guard";
-import { writeStore, writeMatches } from "@/infrastructure/store";
+import { rebuildAndWriteMatches } from "@/infrastructure/store";
+import {
+  persistEmployeeTurn,
+  persistEmployerTurn,
+} from "@/infrastructure/db/scoped-store";
 import { hasGeminiKey } from "@/infrastructure/ai/schemas";
 
 export async function POST(req: Request) {
@@ -48,13 +53,39 @@ export async function POST(req: Request) {
         ? await handleEmployeeChat(store, body.userId, body.message.trim())
         : await handleEmployerChat(store, body.userId, body.message.trim(), body.jobId);
 
-    await writeStore(result.store);
+    if (role === "employee") {
+      const emp = result.store.employees.find((e) => e.userId === body.userId);
+      await persistEmployeeTurn({
+        store: result.store,
+        userId: body.userId,
+        card: result.card as CandidateCard,
+        pendingFieldQuestionIds: emp?.pendingFieldQuestionIds ?? [],
+        cv: result.cv,
+        newMessages: result.newMessages,
+        newFieldAnswers: result.newFieldAnswers,
+        usageRecord: result.usageRecord,
+      });
+    } else {
+      const raw = result.store.employers.find((e) => e.userId === body.userId);
+      if (raw) {
+        const employer = normalizeEmployerRecord(raw);
+        await persistEmployerTurn({
+          store: result.store,
+          userId: body.userId,
+          card: employer.card,
+          jobs: employer.jobs,
+          activeJobId: employer.activeJobId,
+          jobId: result.jobId ?? employer.activeJobId,
+          newMessages: result.newMessages,
+          usageRecord: result.usageRecord,
+        });
+      }
+    }
 
+    // Rebuild from a fresh matching snapshot — actor slice must not drive global matches.
     after(async () => {
       try {
-        // Recompute matches from the just-written state (no extra full read),
-        // and persist only the matches table.
-        await writeMatches(refreshStoreMatches(result.store).matches);
+        await rebuildAndWriteMatches();
       } catch (err) {
         console.error("deferred match refresh failed", err);
       }

@@ -1,5 +1,6 @@
 import { ok, fail } from "@/infrastructure/http";
-import { assertActor } from "@/infrastructure/auth-guard";
+import { authorizeActor } from "@/infrastructure/auth-guard";
+import { readCandidateQueueStore } from "@/infrastructure/store";
 
 export async function GET(req: Request) {
   try {
@@ -7,9 +8,9 @@ export async function GET(req: Request) {
     const userId = url.searchParams.get("userId");
     const jobId = url.searchParams.get("jobId");
     if (!userId) return ok({ error: "חסר userId" }, { status: 400 });
-    const gate = await assertActor(userId);
+    const gate = await authorizeActor(userId);
     if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
-    const store = gate.store;
+    const store = await readCandidateQueueStore(userId, jobId);
     const matches = store.matches
       .filter((m) => {
         if (m.jobOwnerId !== userId || m.status !== "queued") return false;

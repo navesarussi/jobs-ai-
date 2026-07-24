@@ -1,7 +1,8 @@
 import { auth } from "@/auth";
 import { canViewCandidateCv, findCandidateDocument } from "@/domain/cv-access";
 import { isAdminEmail } from "@/infrastructure/admin-config";
-import { assertActor } from "@/infrastructure/auth-guard";
+import { authorizeActor } from "@/infrastructure/auth-guard";
+import { readCvAccessStore } from "@/infrastructure/db/slice-store";
 import { readCandidateDocumentBlob } from "@/infrastructure/files/cv-storage";
 import { ok, fail } from "@/infrastructure/http";
 
@@ -17,16 +18,17 @@ export async function GET(req: Request) {
       return ok({ error: "חסרים פרמטרים" }, { status: 400 });
     }
 
-    const gate = await assertActor(viewerId);
+    const gate = await authorizeActor(viewerId);
     if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 
+    const store = await readCvAccessStore(viewerId, candidateId);
     const session = await auth();
     const isAdmin = isAdminEmail(session?.user?.email);
-    if (!canViewCandidateCv(gate.store, { userId: viewerId, isAdmin }, candidateId)) {
+    if (!canViewCandidateCv(store, { userId: viewerId, isAdmin }, candidateId)) {
       return ok({ error: "אין הרשאה" }, { status: 403 });
     }
 
-    const meta = findCandidateDocument(gate.store, candidateId, documentId);
+    const meta = findCandidateDocument(store, candidateId, documentId);
     if (!meta) return ok({ error: "מסמך לא נמצא" }, { status: 404 });
 
     const bytes = await readCandidateDocumentBlob(meta.storageKey);

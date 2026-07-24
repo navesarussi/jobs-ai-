@@ -7,8 +7,13 @@ Architecture: Domain ← Application ← Infrastructure / App.
 - AI provider swappable (Gemini / heuristic)
 - Product chat behavior is defined in `docs/SSOT/CHAT_AGENTS.md` and SRS FR-CHAT-*
 - Chat intake uses `generateObject({ system, messages })` with full recent history; match rebuild is deferred via `after()`
-- Hot paths: single `readStore` via `assertActor`, chat returns card without full page refetch
+- Hot paths: `assertActor` loads an **actor slice** (self profile/chat/prompts only); list endpoints use opportunity/queue slices
+- Interactive writes use `scoped-store` (per-user upsert / chat insert / chat clear / match status) — not whole-DB `persistStore`
+- Match rebuild deferred via `after()` + `readMatchingStore()` (cards+matches, no chats)
+- In-process full-store cache invalidated on writes; DB pool default max 12 (`DB_POOL_MAX`), prefer cached pooler host on connect
 - Admin prompts: live DB override + reset-to-file defaults (`DELETE /api/admin/prompts`)
+- [PENDING REFACTOR]: split `scoped-store.ts` / `slice-store.ts` / `application/chat.ts` under 200-line cap
+- [PENDING REFACTOR]: SQL-scope field-question broadcast (still rare full-store path)
 
 ## Data layer (Supabase)
 
@@ -24,7 +29,7 @@ Architecture: Domain ← Application ← Infrastructure / App.
 - Employer multi-job: `jobs` jsonb + `matches.job_id`; active job drives chat/candidates
 - Chat persistence: `chat_messages.conversation_context` (`employee`|`employer`) + optional `job_id` — never key chats by `owner_user_id` alone
 - Schema bootstrap: additive `ALTER`s (incl. `conversation_context`) run after `CREATE TABLE IF NOT EXISTS`; context index lives in ALTERS so existing DBs migrate without failing on missing columns
-- [PENDING REFACTOR]: split `SettingsMenu.tsx` / `application/chat.ts` under 200-line cap
+- [PENDING REFACTOR]: split `SettingsMenu.tsx` under 200-line cap
 - [PENDING REFACTOR]: split `domain/cv-merge.ts` under 200-line cap
 - Settings sign-out clears `shidukh_user` + NextAuth session (when present) and returns to `/`
 - [PENDING REFACTOR]: restore employer/admin UI entry points (home role picker, settings default-role, admin menu) after candidate CITOV rebrand phase
