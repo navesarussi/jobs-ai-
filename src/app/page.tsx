@@ -8,6 +8,9 @@ import { SettingsMenu } from "@/components/SettingsMenu";
 import { Button } from "@/components/ui/Button";
 import { useTranslation } from "@/components/LocaleProvider";
 import {
+  adminHomePath,
+  clearSessionOnLogout,
+  consumeSkipAutoLogin,
   getOrCreateDeviceId,
   readRoleDefault,
   readStoredUser,
@@ -16,15 +19,25 @@ import {
   writeStoredUser,
 } from "@/lib/client-session";
 
+type SessionFlags = {
+  googleAuth: boolean;
+  allowDemo: boolean;
+  openAuth: boolean;
+  isAdmin: boolean;
+};
+
 export default function HomePage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const { t, fmt, locale } = useTranslation();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [googleAuth, setGoogleAuth] = useState(false);
-  const [allowDemo, setAllowDemo] = useState(false);
-  const [openAuth, setOpenAuth] = useState(true);
+  const [flags, setFlags] = useState<SessionFlags>({
+    googleAuth: false,
+    allowDemo: false,
+    openAuth: true,
+    isAdmin: false,
+  });
   const [flagsReady, setFlagsReady] = useState(false);
   const autoStarted = useRef(false);
 
@@ -32,14 +45,20 @@ export default function HomePage() {
     void fetch("/api/session")
       .then((r) => r.json())
       .then((d) => {
-        setGoogleAuth(Boolean(d.googleAuth));
-        setAllowDemo(Boolean(d.allowDemo));
-        setOpenAuth(Boolean(d.openAuth));
+        setFlags({
+          googleAuth: Boolean(d.googleAuth),
+          allowDemo: Boolean(d.allowDemo),
+          openAuth: Boolean(d.openAuth),
+          isAdmin: Boolean(d.isAdmin),
+        });
       })
       .catch(() => {
-        setGoogleAuth(false);
-        setAllowDemo(false);
-        setOpenAuth(true);
+        setFlags({
+          googleAuth: false,
+          allowDemo: false,
+          openAuth: true,
+          isAdmin: false,
+        });
       })
       .finally(() => setFlagsReady(true));
   }, []);
@@ -84,21 +103,41 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!flagsReady || autoStarted.current) return;
+    if (consumeSkipAutoLogin()) return;
+
+    if (flags.isAdmin && status === "authenticated") {
+      autoStarted.current = true;
+      router.replace(adminHomePath());
+      return;
+    }
+
     const stored = readStoredUser();
     if (stored?.role === "employee") {
       autoStarted.current = true;
       router.replace(roleHomePath("employee"));
       return;
     }
+
     const roleDefault = readRoleDefault();
-    if (roleDefault === "employee" && (openAuth || allowDemo)) {
+    if (roleDefault === "employee" && (flags.openAuth || flags.allowDemo)) {
       autoStarted.current = true;
       void startCandidate(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot entry
-  }, [flagsReady, openAuth, allowDemo, router]);
+  }, [flagsReady, flags.openAuth, flags.allowDemo, flags.isAdmin, status, router]);
 
-  const canEnter = openAuth || (status === "authenticated" && session?.user);
+  const canEnter = flags.openAuth || (status === "authenticated" && session?.user);
+  const isAdminUser = flags.isAdmin && status === "authenticated";
+
+  async function handleSignOut() {
+    clearSessionOnLogout();
+    try {
+      await signOut({ redirect: false });
+    } catch {
+      // Open-auth — local clear is enough.
+    }
+    router.refresh();
+  }
 
   return (
     <div className="atmosphere">
@@ -126,7 +165,37 @@ export default function HomePage() {
             <p className="text-center text-sm text-[var(--muted)]">{t.home.openingRole}</p>
           ) : null}
 
-          {canEnter ? (
+          {isAdminUser ? (
+            <div className="space-y-3">
+              <p className="text-center text-sm text-[var(--muted)]">
+                {fmt(t.home.connectedAs, {
+                  name: session?.user?.name ?? session?.user?.email ?? "",
+                })}
+              </p>
+              <Button
+                disabled={!!busy}
+                onClick={() => router.replace(adminHomePath())}
+                className="cta-glow brand-gradient-bg w-full border-0 py-4 text-base hover:bg-transparent hover:brightness-105"
+              >
+                {t.home.adminPortal}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!!busy}
+                onClick={() => void startCandidate(false)}
+                className="w-full py-3"
+              >
+                {t.home.continueAsEmployee}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => void handleSignOut()}
+                className="w-full text-xs"
+              >
+                {t.home.signOut}
+              </Button>
+            </div>
+          ) : canEnter ? (
             <div className="space-y-3">
               {status === "authenticated" && session?.user ? (
                 <p className="text-center text-sm text-[var(--muted)]">
@@ -149,7 +218,7 @@ export default function HomePage() {
               {status === "authenticated" ? (
                 <Button
                   variant="ghost"
-                  onClick={() => void signOut({ callbackUrl: "/" })}
+                  onClick={() => void handleSignOut()}
                   className="w-full text-xs"
                 >
                   {t.home.signOut}
@@ -159,19 +228,21 @@ export default function HomePage() {
           ) : (
             <div className="space-y-3">
               <Button
-                disabled={!googleAuth || status === "loading"}
-                onClick={() => void signIn("google", { callbackUrl: "/" })}
+                disabled={!flags.googleAuth || status === "loading"}
+                onClick={() =>
+                  void signIn("google", { callbackUrl: "/", prompt: "select_account" })
+                }
                 className="cta-glow w-full py-4 text-base"
               >
                 {t.home.googleSignIn}
               </Button>
               <p className="text-center text-xs leading-5 text-[var(--muted)]">
-                {googleAuth ? t.home.afterSignInHint : t.home.googleNotConfigured}
+                {flags.googleAuth ? t.home.afterSignInHint : t.home.googleNotConfigured}
               </p>
             </div>
           )}
 
-          {allowDemo ? (
+          {flags.allowDemo ? (
             <Button
               variant="secondary"
               onClick={() => void startCandidate(true)}

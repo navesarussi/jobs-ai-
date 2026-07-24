@@ -6,20 +6,28 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Locale } from "@/i18n/types";
 import { AppVersionBadge } from "@/components/AppVersion";
-import { clearStoredUser } from "@/lib/client-session";
+import { clearSessionOnLogout } from "@/lib/client-session";
 import { signOut } from "next-auth/react";
 
 export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
   const variant = props.variant ?? "fixed";
   const wrapClass =
-    variant === "inline" ? "relative" : "fixed top-3 end-3 z-50 sm:top-4 sm:end-4";
+    variant === "inline" ? "relative z-50" : "fixed top-3 end-3 z-50 sm:top-4 sm:end-4";
   const { t, locale, setLocale } = useTranslation();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
   const [rating, setRating] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  useEffect(() => {
+    void fetch("/api/session")
+      .then((r) => r.json())
+      .then((d: { isAdmin?: boolean }) => setIsAdmin(Boolean(d.isAdmin)))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +70,7 @@ export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
 
   async function handleSignOut() {
     setOpen(false);
-    clearStoredUser();
+    clearSessionOnLogout();
     try {
       await signOut({ redirect: false });
     } catch {
@@ -123,6 +131,11 @@ export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
           <Link href="/legal/about" role="menuitem" className={itemClass(false)} onClick={() => setOpen(false)}>
             {t.settings.about}
           </Link>
+          {isAdmin ? (
+            <Link href="/admin" role="menuitem" className={itemClass(false)} onClick={() => setOpen(false)}>
+              {t.settings.adminPortal}
+            </Link>
+          ) : null}
           <div className="my-1 h-px bg-[var(--stroke)]" />
           <button type="button" role="menuitem" className={itemClass(false)} onClick={reportIssue}>
             {t.settings.report}

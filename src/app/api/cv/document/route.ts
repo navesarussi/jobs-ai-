@@ -2,7 +2,6 @@ import { auth } from "@/auth";
 import { canViewCandidateCv, findCandidateDocument } from "@/domain/cv-access";
 import { isAdminEmail } from "@/infrastructure/admin-config";
 import { assertActor } from "@/infrastructure/auth-guard";
-import { allowOpenAuth } from "@/infrastructure/auth-flags";
 import { readCandidateDocumentBlob } from "@/infrastructure/files/cv-storage";
 import { ok, fail } from "@/infrastructure/http";
 
@@ -22,7 +21,7 @@ export async function GET(req: Request) {
     if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 
     const session = await auth();
-    const isAdmin = isAdminEmail(session?.user?.email) || allowOpenAuth();
+    const isAdmin = isAdminEmail(session?.user?.email);
     if (!canViewCandidateCv(gate.store, { userId: viewerId, isAdmin }, candidateId)) {
       return ok({ error: "אין הרשאה" }, { status: 403 });
     }

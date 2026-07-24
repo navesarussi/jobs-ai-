@@ -30,6 +30,14 @@ export default function EmployeePage() {
     error?: string;
   } | null>(null);
   const [jobs, setJobs] = useState([]);
+  const [showFullCard, setShowFullCard] = useState(false);
+
+  useEffect(() => {
+    void fetch("/api/session")
+      .then((r) => r.json())
+      .then((d: { isAdmin?: boolean }) => setShowFullCard(Boolean(d.isAdmin)))
+      .catch(() => setShowFullCard(false));
+  }, []);
 
   const refreshLists = useCallback(
     async (id: string) => {
@@ -116,7 +124,7 @@ export default function EmployeePage() {
 
       {tab === "chat" ? (
         <div className="enter-delay grid gap-4 lg:grid-cols-[1fr_300px]">
-          <div className="order-2 min-h-[520px] lg:order-1">
+          <div className="min-h-[520px]">
             <ChatPanel
               key={`${userId}-employee`}
               userId={userId}
@@ -127,12 +135,13 @@ export default function EmployeePage() {
               onTurn={onTurn}
             />
           </div>
-          <div className="order-1 space-y-4 lg:order-2">
+          <div className="space-y-4">
             <ProfileAside
               kind="employee"
               userId={userId}
               card={(me?.card as never) ?? null}
               pendingQuestions={me?.pendingQuestions ?? []}
+              showFullCard={showFullCard}
               onFlexibilityChange={(value) => {
                 setMe((prev) =>
                   prev

@@ -18,17 +18,11 @@ export function ProfileAside(props: {
   card: CandidateCard | JobCard | null | undefined;
   pendingQuestions?: { id: string; question: string }[];
   onFlexibilityChange?: (value: number) => void;
+  showFullCard?: boolean;
 }) {
   const { t, fmt } = useTranslation();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const showFullCard = props.showFullCard ?? false;
   const [flex, setFlex] = useState(5);
-
-  useEffect(() => {
-    void fetch("/api/session")
-      .then((r) => r.json())
-      .then((d: { isAdmin?: boolean }) => setIsAdmin(Boolean(d.isAdmin)))
-      .catch(() => setIsAdmin(false));
-  }, []);
 
   const c =
     props.card ??
@@ -53,7 +47,7 @@ export function ProfileAside(props: {
   }
 
   return (
-    <Panel as="aside" className="flex max-h-[70vh] flex-col p-5">
+    <Panel as="aside" className={`flex flex-col p-5 ${showFullCard ? "max-h-[70vh]" : ""}`}>
       <h2 className="text-sm font-bold text-[var(--hero)]">
         {props.kind === "employee" ? t.profile.yourCard : t.profile.jobCard}
       </h2>
@@ -82,13 +76,13 @@ export function ProfileAside(props: {
 
       <FlexibilitySlider userId={props.userId} value={flex} onChange={onFlex} />
 
-      {props.pendingQuestions && props.pendingQuestions.length > 0 ? (
+      {showFullCard && props.pendingQuestions && props.pendingQuestions.length > 0 ? (
         <div className="mt-3 rounded-xl bg-[var(--warn-bg)] p-3 text-xs text-[var(--warn)]">
           {fmt(t.profile.pendingQuestions, { count: props.pendingQuestions.length })}
         </div>
       ) : null}
 
-      {isAdmin ? (
+      {showFullCard ? (
         <>
           <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{t.profile.autoFillHint}</p>
           <dl className="mt-3 space-y-2 overflow-y-auto pe-1 text-sm">

@@ -3,6 +3,7 @@ import type { Role } from "@/domain/types";
 export const USER_STORAGE_KEY = "shidukh_user";
 export const ROLE_DEFAULT_KEY = "shidukh_role_default";
 export const DEVICE_ID_KEY = "shidukh_device_id";
+export const SKIP_AUTO_LOGIN_KEY = "shidukh_skip_auto_login";
 
 export function readStoredUser(): {
   id: string;
@@ -30,6 +31,25 @@ export function clearStoredUser(): void {
   localStorage.removeItem(USER_STORAGE_KEY);
 }
 
+export function markSkipAutoLogin(): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(SKIP_AUTO_LOGIN_KEY, "1");
+}
+
+export function consumeSkipAutoLogin(): boolean {
+  if (typeof window === "undefined") return false;
+  const skip = sessionStorage.getItem(SKIP_AUTO_LOGIN_KEY) === "1";
+  if (skip) sessionStorage.removeItem(SKIP_AUTO_LOGIN_KEY);
+  return skip;
+}
+
+/** Clears persisted session so the user can pick a different account on next sign-in. */
+export function clearSessionOnLogout(): void {
+  clearStoredUser();
+  writeRoleDefault(null);
+  markSkipAutoLogin();
+}
+
 export function readRoleDefault(): Role | null {
   if (typeof window === "undefined") return null;
   const v = localStorage.getItem(ROLE_DEFAULT_KEY);
@@ -55,4 +75,8 @@ export function getOrCreateDeviceId(): string {
 
 export function roleHomePath(role: Role): string {
   return role === "employee" ? "/employee" : "/employer";
+}
+
+export function adminHomePath(): string {
+  return "/admin";
 }

@@ -17,12 +17,14 @@ import { readStore } from "@/infrastructure/store";
 
 export async function GET() {
   const session = await auth();
-  const isAdmin = isAdminEmail(session?.user?.email) || allowOpenAuth();
+  const email = session?.user?.email ?? null;
+  const isAdmin = isAdminEmail(email);
   return ok({
     googleAuth: hasGoogleAuth(),
     allowDemo: allowDemoMode(),
     openAuth: allowOpenAuth(),
     isAdmin,
+    email,
   });
 }
 
