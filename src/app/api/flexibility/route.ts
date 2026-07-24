@@ -3,7 +3,7 @@ import { applyFlexibility } from "@/application/update-flexibility";
 import type { CandidateCard, JobCard } from "@/domain/types";
 import { ok, fail } from "@/infrastructure/http";
 import { assertActor } from "@/infrastructure/auth-guard";
-import { rebuildAndWriteMatches } from "@/infrastructure/store";
+import { scheduleMatchRebuild } from "@/infrastructure/db/match-scheduler";
 import {
   persistEmployeeProfile,
   persistEmployerProfile,
@@ -42,12 +42,8 @@ export async function PATCH(req: Request) {
       });
     }
 
-    after(async () => {
-      try {
-        await rebuildAndWriteMatches();
-      } catch (err) {
-        console.error("deferred flexibility match refresh failed", err);
-      }
+    after(() => {
+      scheduleMatchRebuild();
     });
 
     return ok({ ok: true, flexibility: Math.round(body.value) });

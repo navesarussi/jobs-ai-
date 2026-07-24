@@ -9,10 +9,12 @@ Architecture: Domain ← Application ← Infrastructure / App.
 - Chat intake uses `generateObject({ system, messages })` with full recent history; match rebuild is deferred via `after()`
 - Hot paths: `assertActor` loads an **actor slice** (self profile/chat/prompts only); list endpoints use opportunity/queue slices
 - Interactive writes use `scoped-store` (per-user upsert / chat insert / chat clear / match status) — not whole-DB `persistStore`
-- Match rebuild deferred via `after()` + `readMatchingStore()` (cards+matches, no chats)
-- In-process full-store cache invalidated on writes; DB pool default max 12 (`DB_POOL_MAX`), prefer cached pooler host on connect
+- Chat replies **stream** (NDJSON deltas); card extraction runs in parallel off the reply path
+- Match rebuild debounced via `scheduleMatchRebuild` (~1.5s coalesce) + `readMatchingStore()` (cards+matches, no chats)
+- Shared in-process cache for `field_questions` + `admin_settings` (invalidated on writes)
+- DB pool default max 12 (`DB_POOL_MAX`), prefer cached pooler host on connect
 - Admin prompts: live DB override + reset-to-file defaults (`DELETE /api/admin/prompts`)
-- [PENDING REFACTOR]: split `scoped-store.ts` / `slice-store.ts` / `application/chat.ts` under 200-line cap
+- [PENDING REFACTOR]: split `scoped-store.ts` / `slice-store.ts` / chat route under 200-line cap
 - [PENDING REFACTOR]: SQL-scope field-question broadcast (still rare full-store path)
 
 ## Data layer (Supabase)

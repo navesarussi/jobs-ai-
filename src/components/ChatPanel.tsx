@@ -19,6 +19,11 @@ export type ChatTurnPayload = {
   jobId?: string;
 };
 
+type StreamEvent =
+  | { type: "delta"; text: string }
+  | ({ type: "final" } & ChatTurnPayload)
+  | { type: "error"; error: string };
+
 export function ChatPanel(props: {
   userId: string;
   role: "employee" | "employer";
@@ -34,6 +39,7 @@ export function ChatPanel(props: {
   const [messages, setMessages] = useState<Msg[]>(props.initialMessages);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [streamingId, setStreamingId] = useState<string | null>(null);
   const [provider, setProvider] = useState("");
   const [degraded, setDegraded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -44,14 +50,21 @@ export function ChatPanel(props: {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, busy]);
+  }, [messages, busy, streamingId]);
 
   async function send() {
     const text = input.trim();
     if (!text || busy || props.blockedReason) return;
     setInput("");
     setBusy(true);
-    setMessages((m) => [...m, { id: `local-${Date.now()}`, role: "user", content: text }]);
+    const assistantId = `a-${Date.now()}`;
+    setStreamingId(assistantId);
+    setMessages((m) => [
+      ...m,
+      { id: `local-${Date.now()}`, role: "user", content: text },
+      { id: assistantId, role: "assistant", content: "" },
+    ]);
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -64,31 +77,105 @@ export function ChatPanel(props: {
           jobId: props.jobId,
         }),
       });
-      const data = (await res.json()) as ChatTurnPayload;
-      if (data.error) {
-        setMessages((m) => [
-          ...m,
-          { id: `err-${Date.now()}`, role: "assistant", content: data.error! },
-        ]);
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("ndjson") && !contentType.includes("json")) {
+        throw new Error("bad content type");
+      }
+
+      // Legacy JSON fallback (non-stream errors from auth/validation).
+      if (contentType.includes("application/json") && !contentType.includes("ndjson")) {
+        const data = (await res.json()) as ChatTurnPayload;
+        if (data.error) {
+          setMessages((m) =>
+            m.map((msg) =>
+              msg.id === assistantId ? { ...msg, content: data.error! } : msg,
+            ),
+          );
+          return;
+        }
+        setProvider(data.provider ?? data.aiMode ?? "");
+        setDegraded(Boolean(data.aiDegraded));
+        setMessages((m) =>
+          m.map((msg) =>
+            msg.id === assistantId
+              ? { ...msg, content: data.reply ?? t.chat.replyFailed }
+              : msg,
+          ),
+        );
+        props.onTurn?.(data);
         return;
       }
-      setProvider(data.provider ?? data.aiMode ?? "");
-      setDegraded(Boolean(data.aiDegraded));
-      setMessages((m) => [
-        ...m,
-        {
-          id: `a-${Date.now()}`,
-          role: "assistant",
-          content: data.reply ?? t.chat.replyFailed,
-        },
-      ]);
-      props.onTurn?.(data);
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("no body");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotFinal = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let event: StreamEvent;
+          try {
+            event = JSON.parse(line) as StreamEvent;
+          } catch {
+            continue;
+          }
+          if (event.type === "delta" && event.text) {
+            setMessages((m) =>
+              m.map((msg) =>
+                msg.id === assistantId
+                  ? { ...msg, content: msg.content + event.text }
+                  : msg,
+              ),
+            );
+          } else if (event.type === "error") {
+            setMessages((m) =>
+              m.map((msg) =>
+                msg.id === assistantId ? { ...msg, content: event.error } : msg,
+              ),
+            );
+          } else if (event.type === "final") {
+            gotFinal = true;
+            setProvider(event.provider ?? event.aiMode ?? "");
+            setDegraded(Boolean(event.aiDegraded));
+            if (event.reply) {
+              setMessages((m) =>
+                m.map((msg) =>
+                  msg.id === assistantId ? { ...msg, content: event.reply! } : msg,
+                ),
+              );
+            }
+            props.onTurn?.(event);
+          }
+        }
+      }
+
+      if (!gotFinal) {
+        setMessages((m) =>
+          m.map((msg) =>
+            msg.id === assistantId && !msg.content
+              ? { ...msg, content: t.chat.replyFailed }
+              : msg,
+          ),
+        );
+      }
     } catch {
-      setMessages((m) => [
-        ...m,
-        { id: `err-${Date.now()}`, role: "assistant", content: t.chat.replyFailed },
-      ]);
+      setMessages((m) =>
+        m.map((msg) =>
+          msg.id === assistantId
+            ? { ...msg, content: msg.content || t.chat.replyFailed }
+            : msg,
+        ),
+      );
     } finally {
+      setStreamingId(null);
       setBusy(false);
     }
   }
@@ -117,6 +204,8 @@ export function ChatPanel(props: {
       setBusy(false);
     }
   }
+
+  const showTyping = busy && !streamingId;
 
   return (
     <div className="chat-surface flex h-full min-h-[480px] flex-col">
@@ -155,19 +244,24 @@ export function ChatPanel(props: {
             {props.blockedReason ?? (props.role === "employee" ? t.chat.employeeEmptyHint : t.chat.employerEmptyHint)}
           </div>
         ) : null}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={
-              m.role === "user"
-                ? "chat-msg ms-6 max-w-[85%] rounded-2xl rounded-se-sm bg-[var(--accent)] px-4 py-3 text-sm leading-6 text-white shadow-lg"
-                : "chat-msg me-6 max-w-[90%] rounded-2xl rounded-ss-sm border border-[var(--stroke)] bg-white px-4 py-3 text-sm leading-6 text-[var(--ink)] shadow-sm"
-            }
-          >
-            {m.content}
-          </div>
-        ))}
-        {busy ? (
+        {messages.map((m) =>
+          m.role === "assistant" && m.id === streamingId && !m.content ? null : (
+            <div
+              key={m.id}
+              className={
+                m.role === "user"
+                  ? "chat-msg ms-6 max-w-[85%] rounded-2xl rounded-se-sm bg-[var(--accent)] px-4 py-3 text-sm leading-6 text-white shadow-lg"
+                  : "chat-msg me-6 max-w-[90%] rounded-2xl rounded-ss-sm border border-[var(--stroke)] bg-white px-4 py-3 text-sm leading-6 text-[var(--ink)] shadow-sm"
+              }
+            >
+              {m.content}
+              {m.id === streamingId && m.content ? (
+                <span className="ms-0.5 inline-block h-3 w-0.5 animate-pulse bg-[var(--accent)] align-middle" />
+              ) : null}
+            </div>
+          ),
+        )}
+        {showTyping || (streamingId && messages.find((m) => m.id === streamingId)?.content === "") ? (
           <div className="chat-msg me-6 inline-flex items-center gap-2 rounded-2xl border border-[var(--stroke)] bg-white px-4 py-3 text-xs text-[var(--muted)]">
             <span>{t.chat.typing}</span>
             <span className="typing-dots" aria-hidden>
