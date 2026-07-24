@@ -32,6 +32,9 @@ export function ChatPanel(props: {
   placeholder: string;
   jobId?: string;
   blockedReason?: string;
+  topSlot?: React.ReactNode;
+  blockedFooter?: React.ReactNode;
+  lockedOverlay?: React.ReactNode;
   onTurn?: (payload: ChatTurnPayload) => void;
   onReset?: () => void;
 }) {
@@ -205,10 +208,11 @@ export function ChatPanel(props: {
     }
   }
 
+  const blocked = Boolean(props.blockedReason);
   const showTyping = busy && !streamingId;
 
   return (
-    <div className="chat-surface flex h-full min-h-[480px] flex-col">
+    <div className="chat-surface flex h-full min-h-0 flex-col">
       <div className="chat-surface__header flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -238,10 +242,12 @@ export function ChatPanel(props: {
         </div>
       </div>
 
-      <div className="chat-surface__body flex-1 space-y-4 overflow-y-auto px-4 py-5">
-        {messages.length === 0 ? (
-          <div className="chat-msg mx-auto max-w-md rounded-2xl border border-dashed border-[var(--stroke)] bg-white/60 px-5 py-4 text-center text-sm leading-7 text-[var(--muted)]">
-            {props.blockedReason ?? (props.role === "employee" ? t.chat.employeeEmptyHint : t.chat.employerEmptyHint)}
+      {props.topSlot ? <div className="border-b border-[var(--stroke)] bg-white/90">{props.topSlot}</div> : null}
+
+      <div className="chat-surface__body relative flex-1 space-y-4 overflow-y-auto px-4 py-5">
+        {messages.length === 0 && !blocked ? (
+          <div className="empty-state chat-msg mx-auto max-w-md rounded-2xl border border-dashed border-[var(--stroke)] px-6 py-5 text-center text-sm leading-7 text-[var(--muted)]">
+            {props.role === "employee" ? t.chat.employeeEmptyHint : t.chat.employerEmptyHint}
           </div>
         ) : null}
         {messages.map((m) =>
@@ -272,33 +278,44 @@ export function ChatPanel(props: {
           </div>
         ) : null}
         <div ref={bottomRef} />
+        {blocked && props.lockedOverlay ? (
+          <div className="employee-chat-locked-layer">{props.lockedOverlay}</div>
+        ) : null}
       </div>
 
       <div className="border-t border-[var(--stroke)] bg-white/80 p-4 backdrop-blur">
-        {props.blockedReason ? (
-          <p className="mb-3 rounded-xl bg-[var(--warn-bg)] px-3 py-2 text-center text-xs leading-5 text-[var(--warn)]">
-            {props.blockedReason}
-          </p>
-        ) : null}
-        <div className="flex gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void send();
-            }}
-            placeholder={props.blockedReason ? t.chat.cvRequiredPlaceholder : props.placeholder}
-            disabled={Boolean(props.blockedReason)}
-            className="min-h-12 flex-1 rounded-full border border-[var(--stroke)] bg-[var(--chip)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-60"
-          />
-          <Button
-            onClick={() => void send()}
-            disabled={busy || Boolean(props.blockedReason)}
-            className="brand-gradient-bg min-h-12 rounded-full px-6 hover:bg-transparent hover:brightness-105"
-          >
-            {t.chat.send}
-          </Button>
-        </div>
+        {blocked && props.lockedOverlay ? (
+          <p className="text-center text-xs leading-5 text-[var(--muted)]">{t.chat.cvRequired}</p>
+        ) : blocked && props.blockedFooter ? (
+          props.blockedFooter
+        ) : (
+          <>
+            {props.blockedReason && !props.lockedOverlay ? (
+              <p className="mb-3 rounded-xl bg-[var(--warn-bg)] px-3 py-2 text-center text-xs leading-5 text-[var(--warn)]">
+                {t.chat.cvRequired}
+              </p>
+            ) : null}
+            <div className="flex gap-2">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void send();
+                }}
+                placeholder={blocked ? t.chat.cvRequiredPlaceholder : props.placeholder}
+                disabled={blocked}
+                className="min-h-12 flex-1 rounded-full border border-[var(--stroke)] bg-[var(--chip)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <Button
+                onClick={() => void send()}
+                disabled={busy || blocked}
+                className="brand-gradient-bg min-h-12 rounded-full px-6 hover:bg-transparent hover:brightness-105"
+              >
+                {t.chat.send}
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

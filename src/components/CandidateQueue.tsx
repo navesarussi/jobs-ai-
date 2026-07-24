@@ -62,33 +62,33 @@ export function CandidateQueue(props: {
 
   if (props.items.length === 0) {
     return (
-      <div className="panel rounded-[var(--panel-radius)] border-dashed p-8 text-center text-sm text-[var(--muted)]">
+      <div className="empty-state panel-elevated border-dashed p-12 text-center text-sm text-[var(--muted)]">
         {t.candidates.empty}
       </div>
     );
   }
 
   return (
-    <div className="tab-fade space-y-3">
+    <div className="tab-fade space-y-4">
       {props.items.map((item) => (
         <article
           key={item.matchId}
-          className="panel rounded-[var(--panel-radius)] p-4 transition duration-200 hover:border-[var(--accent)]"
+          className="panel-elevated p-5 transition duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/40 hover:shadow-[var(--shadow-md)]"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="font-semibold text-[var(--hero)]">{item.name}</h3>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-[var(--hero)]">{item.name}</h3>
+              <p className="mt-1.5 text-sm text-[var(--muted)]">
                 {item.card?.desiredRole || t.candidates.roleNotSpecified}
                 {item.card?.field ? ` · ${item.card.field}` : ""}
                 {item.card?.location ? ` · ${item.card.location}` : ""}
               </p>
             </div>
-            <span className="rounded-full bg-[var(--bubble)] px-2.5 py-1 text-xs font-medium text-[var(--accent-strong)]">
+            <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-semibold text-[var(--accent-strong)]">
               {Math.round(item.score * 100)}%
             </span>
           </div>
-          <p className="mt-3 text-sm leading-6 text-[var(--ink)]">{item.reason}</p>
+          <p className="mt-4 text-sm leading-7 text-[var(--ink)]">{item.reason}</p>
           {item.card?.personality ? (
             <p className="mt-2 text-xs text-[var(--muted)]">
               {fmt(t.candidates.personality, { value: item.card.personality })}

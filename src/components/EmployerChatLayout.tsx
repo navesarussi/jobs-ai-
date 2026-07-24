@@ -22,8 +22,8 @@ export function EmployerChatLayout(props: {
   onImportDone: () => void;
 }) {
   return (
-    <div className="enter-delay-2 grid gap-4 lg:grid-cols-[1fr_280px]">
-      <div>
+    <div className="enter-delay-2 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18.5rem] lg:items-start">
+      <div className="min-h-[min(68vh,720px)]">
         <ChatPanel
           key={`${props.userId}-${props.activeJobId ?? "job"}-employer`}
           userId={props.userId}
@@ -35,7 +35,7 @@ export function EmployerChatLayout(props: {
           onTurn={props.onTurn}
         />
       </div>
-      <div className="relative space-y-4">
+      <div className="relative space-y-4 lg:sticky lg:top-[calc(var(--header-height)+1rem)]">
         {props.hydrating ? (
           <p className="mb-2 text-xs text-[var(--muted)] opacity-70">…</p>
         ) : null}

@@ -107,20 +107,22 @@ export default function EmployerPage() {
 
   if (!sessionReady) {
     return (
-      <main className="mx-auto max-w-lg px-5 py-16 text-center">
-        <p className="text-[var(--muted)]">{t.session.loading}</p>
+      <main className="workspace-loading atmosphere">
+        <p>{t.session.loading}</p>
       </main>
     );
   }
 
   if (!userId) {
     return (
-      <main className="mx-auto max-w-lg px-5 py-16 text-center">
+      <main className="workspace-loading atmosphere">
         <SettingsMenu />
-        <p className="text-[var(--muted)]">{t.session.noActiveSession}</p>
-        <Link href="/for-employers" className="mt-4 inline-block text-[var(--accent)]">
-          {t.session.backToStart}
-        </Link>
+        <div>
+          <p>{t.session.noActiveSession}</p>
+          <Link href="/for-employers" className="mt-4 inline-block text-[var(--accent)]">
+            {t.session.backToStart}
+          </Link>
+        </div>
       </main>
     );
   }
@@ -131,21 +133,19 @@ export default function EmployerPage() {
         name={name}
         subtitle={t.employer.subtitle}
         homeHref="/for-employers"
+        settings={<SettingsMenu variant="header" />}
         tabs={
-          <>
-            <SettingsMenu variant="inline" />
-            <SegmentedTabs
-              value={tab}
-              onChange={(id) => setTab(id as Tab)}
-              tabs={[
-                { id: "chat", label: t.employer.chatTab },
-                {
-                  id: "candidates",
-                  label: fmt(t.employer.candidatesTab, { count: candidates.length }),
-                },
-              ]}
-            />
-          </>
+          <SegmentedTabs
+            value={tab}
+            onChange={(id) => setTab(id as Tab)}
+            tabs={[
+              { id: "chat", label: t.employer.chatTab },
+              {
+                id: "candidates",
+                label: fmt(t.employer.candidatesTab, { count: candidates.length }),
+              },
+            ]}
+          />
         }
       />
       <main className="workspace-main">

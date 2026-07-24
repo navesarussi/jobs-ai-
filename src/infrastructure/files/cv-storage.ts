@@ -1,5 +1,8 @@
+import { shouldUseMemoryStore } from "@/infrastructure/db/memory-store";
 import { getPool } from "@/infrastructure/db/pool";
 import { ensureSchema } from "@/infrastructure/db/schema";
+
+const memoryBlobs = new Map<string, Buffer>();
 
 /** Persist CV bytes in Postgres (works with existing DATABASE_URL; no Storage required). */
 export async function saveCandidateDocumentBlob(params: {
@@ -7,6 +10,12 @@ export async function saveCandidateDocumentBlob(params: {
   userId: string;
   content: Buffer;
 }): Promise<string> {
+  if (shouldUseMemoryStore()) {
+    const key = `mem:${params.id}`;
+    memoryBlobs.set(key, params.content);
+    return key;
+  }
+
   await ensureSchema();
   const pool = await getPool();
   await pool.query(
@@ -19,6 +28,10 @@ export async function saveCandidateDocumentBlob(params: {
 }
 
 export async function readCandidateDocumentBlob(storageKey: string): Promise<Buffer | null> {
+  if (storageKey.startsWith("mem:")) {
+    return memoryBlobs.get(storageKey) ?? null;
+  }
+
   await ensureSchema();
   if (!storageKey.startsWith("pg:")) return null;
   const id = storageKey.slice(3);
@@ -30,4 +43,9 @@ export async function readCandidateDocumentBlob(storageKey: string): Promise<Buf
   const row = result.rows[0];
   if (!row?.content) return null;
   return Buffer.isBuffer(row.content) ? row.content : Buffer.from(row.content);
+}
+
+/** Test helper — clears in-memory blobs between tests. */
+export function clearMemoryDocumentBlobs(): void {
+  memoryBlobs.clear();
 }

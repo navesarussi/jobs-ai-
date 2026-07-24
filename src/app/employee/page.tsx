@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { CandidateProfileStrip } from "@/components/CandidateProfileStrip";
-import { ChatPanel, type ChatTurnPayload } from "@/components/ChatPanel";
-import { FileImport } from "@/components/FileImport";
+import { EmployeeChatLayout } from "@/components/EmployeeChatLayout";
+import { type ChatTurnPayload } from "@/components/ChatPanel";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "@/components/LocaleProvider";
 import { OpportunityList } from "@/components/OpportunityList";
 import { WorkspaceHeader } from "@/components/WorkspaceHeader";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { useStoredUser } from "@/lib/use-stored-user";
+import type { CandidateCard } from "@/domain/types";
 
 type Tab = "chat" | "jobs";
 
@@ -77,20 +77,22 @@ export default function EmployeePage() {
 
   if (!sessionReady) {
     return (
-      <main className="mx-auto max-w-lg px-5 py-16 text-center">
-        <p className="text-[var(--muted)]">{t.session.loading}</p>
+      <main className="workspace-loading atmosphere">
+        <p>{t.session.loading}</p>
       </main>
     );
   }
 
   if (!userId) {
     return (
-      <main className="mx-auto max-w-lg px-5 py-16 text-center">
+      <main className="workspace-loading atmosphere">
         <SettingsMenu />
-        <p className="text-[var(--muted)]">{t.session.noActiveSession}</p>
-        <Link href="/" className="mt-4 inline-block text-[var(--accent)]">
-          {t.session.backToStart}
-        </Link>
+        <div>
+          <p>{t.session.noActiveSession}</p>
+          <Link href="/" className="mt-4 inline-block text-[var(--accent)]">
+            {t.session.backToStart}
+          </Link>
+        </div>
       </main>
     );
   }
@@ -98,26 +100,23 @@ export default function EmployeePage() {
   const hasCv = Boolean(me?.hasCv);
 
   return (
-    <div className="workspace-shell atmosphere">
+    <div className="workspace-shell workspace-shell--employee atmosphere">
       <WorkspaceHeader
         name={name}
-        subtitle={t.employee.subtitle}
+        settings={<SettingsMenu variant="header" />}
         tabs={
-          <>
-            <SettingsMenu variant="inline" />
-            <SegmentedTabs
-              value={tab}
-              onChange={(id) => setTab(id as Tab)}
-              tabs={[
-                { id: "chat", label: t.employee.chatTab },
-                { id: "jobs", label: fmt(t.employee.jobsTab, { count: jobs.length }) },
-              ]}
-            />
-          </>
+          <SegmentedTabs
+            value={tab}
+            onChange={(id) => setTab(id as Tab)}
+            tabs={[
+              { id: "chat", label: t.employee.chatTab },
+              { id: "jobs", label: fmt(t.employee.jobsTab, { count: jobs.length }) },
+            ]}
+          />
         }
       />
 
-      <main className="workspace-main">
+      <main className={`workspace-main ${tab === "chat" ? "workspace-main--fit" : ""}`}>
       {me?.error ? (
         <p className="mb-4 rounded-xl bg-[var(--warn-bg)] px-3 py-2 text-sm text-[var(--warn)]">
           {me.error}
@@ -125,48 +124,31 @@ export default function EmployeePage() {
       ) : null}
 
       {tab === "chat" ? (
-        <div className="enter-delay mx-auto flex max-w-3xl flex-col gap-3">
-          <FileImport
-            userId={userId}
-            endpoint="/api/cv"
-            title={t.fileImport.cvTitle}
-            hint={t.fileImport.cvHint}
-            minimalSummary
-            cvMode
-            hasExisting={hasCv}
-            existingFileName={me?.cvFileName}
-            pendingAnalysis={me?.cvExtractionStatus === "pending"}
-            onDone={() => void refresh(userId)}
-          />
-          <CandidateProfileStrip
-            userId={userId}
-            card={(me?.card as never) ?? null}
-            onFlexibilityChange={(value) => {
-              setMe((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      card: { ...(prev.card as object), flexibility: value },
-                    }
-                  : prev,
-              );
-            }}
-          />
-          <div className="min-h-[480px]">
-            <ChatPanel
-              key={`${userId}-employee`}
-              userId={userId}
-              role="employee"
-              locale={locale}
-              initialMessages={me?.chat ?? []}
-              placeholder={t.employee.chatPlaceholder}
-              blockedReason={hasCv ? undefined : t.chat.cvRequired}
-              onTurn={onTurn}
-            />
-          </div>
-        </div>
+        <EmployeeChatLayout
+          userId={userId}
+          locale={locale}
+          chat={me?.chat ?? []}
+          card={(me?.card as CandidateCard | null) ?? null}
+          hasCv={hasCv}
+          cvFileName={me?.cvFileName}
+          cvPending={me?.cvExtractionStatus === "pending"}
+          scheduledInterviews={jobs.length}
+          placeholder={t.employee.chatPlaceholder}
+          onTurn={onTurn}
+          onFlexibilityChange={(value) => {
+            setMe((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    card: { ...(prev.card as object), flexibility: value },
+                  }
+                : prev,
+            );
+          }}
+          onCvDone={() => void refresh(userId)}
+        />
       ) : (
-        <div className="enter-delay">
+        <div className="workspace-stack enter-delay tab-fade">
           <OpportunityList jobs={jobs} />
         </div>
       )}

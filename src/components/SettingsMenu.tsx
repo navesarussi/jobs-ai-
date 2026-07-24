@@ -5,15 +5,17 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Locale } from "@/i18n/types";
-import { AppVersionBadge } from "@/components/AppVersion";
+import { formatAppVersion } from "@/lib/version";
 import { clearSessionOnLogout, roleLandingPath } from "@/lib/client-session";
 import { signOut } from "next-auth/react";
 
-export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
+export function SettingsMenu(props: { variant?: "fixed" | "inline" | "header" }) {
   const variant = props.variant ?? "fixed";
   const wrapClass =
-    variant === "inline" ? "relative z-50" : "fixed top-3 end-3 z-50 sm:top-4 sm:end-4";
-  const { t, locale, setLocale } = useTranslation();
+    variant === "fixed"
+      ? "fixed top-3 end-3 z-50 sm:top-4 sm:end-4"
+      : "relative z-50";
+  const { t, locale, setLocale, fmt } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -86,7 +88,13 @@ export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
     router.refresh();
   }
 
-  const menuAlignClass = variant === "inline" ? "start-0" : "end-0";
+  const menuAlignClass = variant === "fixed" ? "end-0" : "start-0";
+  const triggerClass =
+    variant === "header"
+      ? "settings-trigger settings-trigger--header"
+      : variant === "inline"
+        ? "settings-trigger settings-trigger--inline"
+        : "settings-trigger settings-trigger--fixed";
 
   return (
     <div ref={rootRef} className={wrapClass}>
@@ -97,115 +105,123 @@ export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-[var(--stroke)] bg-[var(--surface)] text-[var(--accent)] shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)] hover:bg-[var(--bubble)]"
+        className={triggerClass}
       >
-        <SettingsIcon />
+        <MenuIcon open={open} />
       </button>
 
       {open ? (
         <div
           id={menuId}
           role="menu"
-          className={`panel absolute top-12 ${menuAlignClass} z-[60] max-h-[80vh] w-72 max-w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto rounded-2xl py-1 text-sm shadow-[var(--shadow-soft)]`}
+          className={`settings-menu-dropdown absolute top-[calc(100%+0.5rem)] ${menuAlignClass} z-[60]`}
         >
-          <p className="px-3 py-2 text-[11px] font-semibold tracking-wide text-[var(--muted)] uppercase">
-            {t.settings.title}
-          </p>
-          <MenuSection label={t.settings.language}>
+          <div className="settings-menu-dropdown__header">
+            <p className="settings-menu-dropdown__title">{t.settings.title}</p>
+            <p className="settings-menu-dropdown__subtitle">CITOV</p>
+          </div>
+
+          <div className="settings-menu-dropdown__body">
+            <section className="settings-menu-section">
+              <p className="settings-menu-section__label">{t.settings.language}</p>
+              <div className="settings-lang-switch" role="group" aria-label={t.settings.language}>
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={locale === "he"}
+                  className={`settings-lang-switch__btn ${locale === "he" ? "settings-lang-switch__btn--active" : ""}`}
+                  onClick={() => switchLocale("he")}
+                >
+                  {t.language.hebrew}
+                </button>
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={locale === "en"}
+                  className={`settings-lang-switch__btn ${locale === "en" ? "settings-lang-switch__btn--active" : ""}`}
+                  onClick={() => switchLocale("en")}
+                >
+                  {t.language.english}
+                </button>
+              </div>
+            </section>
+
+            <section className="settings-menu-section">
+              <MenuLink href="/legal/privacy" icon="shield" onClick={() => setOpen(false)}>
+                {t.settings.privacy}
+              </MenuLink>
+              <MenuLink href="/legal/terms" icon="doc" onClick={() => setOpen(false)}>
+                {t.settings.terms}
+              </MenuLink>
+              <MenuLink href="/legal/about" icon="info" onClick={() => setOpen(false)}>
+                {t.settings.about}
+              </MenuLink>
+              {isAdmin ? (
+                <MenuLink href="/admin" icon="admin" onClick={() => setOpen(false)}>
+                  {t.settings.adminPortal}
+                </MenuLink>
+              ) : null}
+            </section>
+
+            <section className="settings-menu-section">
+              <MenuButton icon="report" onClick={reportIssue}>
+                {t.settings.report}
+              </MenuButton>
+              <MenuButton
+                icon="star"
+                onClick={() => {
+                  setRateOpen(true);
+                  setOpen(false);
+                }}
+              >
+                {t.settings.rate}
+              </MenuButton>
+            </section>
+
             <button
               type="button"
               role="menuitem"
-              className={itemClass(locale === "he")}
-              onClick={() => switchLocale("he")}
+              className="settings-menu-signout"
+              onClick={() => void handleSignOut()}
             >
-              {t.language.hebrew}
+              <MenuGlyph name="logout" />
+              <span>{t.settings.signOut}</span>
             </button>
-            <button
-              type="button"
-              role="menuitem"
-              className={itemClass(locale === "en")}
-              onClick={() => switchLocale("en")}
-            >
-              {t.language.english}
-            </button>
-          </MenuSection>
-          <div className="my-1 h-px bg-[var(--stroke)]" />
-          <Link href="/legal/privacy" role="menuitem" className={itemClass(false)} onClick={() => setOpen(false)}>
-            {t.settings.privacy}
-          </Link>
-          <Link href="/legal/terms" role="menuitem" className={itemClass(false)} onClick={() => setOpen(false)}>
-            {t.settings.terms}
-          </Link>
-          <Link href="/legal/about" role="menuitem" className={itemClass(false)} onClick={() => setOpen(false)}>
-            {t.settings.about}
-          </Link>
-          {isAdmin ? (
-            <Link href="/admin" role="menuitem" className={itemClass(false)} onClick={() => setOpen(false)}>
-              {t.settings.adminPortal}
-            </Link>
-          ) : null}
-          <div className="my-1 h-px bg-[var(--stroke)]" />
-          <button type="button" role="menuitem" className={itemClass(false)} onClick={reportIssue}>
-            {t.settings.report}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={itemClass(false)}
-            onClick={() => {
-              setRateOpen(true);
-              setOpen(false);
-            }}
-          >
-            {t.settings.rate}
-          </button>
-          <div className="my-1 h-px bg-[var(--stroke)]" />
-          <button
-            type="button"
-            role="menuitem"
-            className={`${itemClass(false)} text-[var(--warn)]`}
-            onClick={() => void handleSignOut()}
-          >
-            {t.settings.signOut}
-          </button>
-          <div className="my-1 h-px bg-[var(--stroke)]" />
-          <AppVersionBadge />
+          </div>
+
+          <footer className="settings-menu-dropdown__footer">
+            {fmt(t.app.versionLabel, { version: formatAppVersion() })}
+          </footer>
         </div>
       ) : null}
 
       {rateOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 sm:items-center">
-          <div className="panel w-full max-w-sm rounded-2xl p-5">
-            <h2 className="text-base font-semibold text-[var(--hero)]">{t.settings.rateTitle}</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">{t.settings.rateHint}</p>
-            <div className="mt-4 flex justify-center gap-2">
+        <div className="settings-rate-backdrop">
+          <div className="settings-rate-card" role="dialog" aria-modal="true">
+            <h2 className="settings-rate-card__title">{t.settings.rateTitle}</h2>
+            <p className="settings-rate-card__hint">{t.settings.rateHint}</p>
+            <div className="settings-rate-card__stars">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => setRating(n)}
-                  className={`h-10 w-10 cursor-pointer rounded-full text-lg transition duration-200 ${
-                    rating >= n ? "text-[var(--gold)]" : "text-[var(--stroke)]"
-                  }`}
+                  className={`settings-rate-star ${rating >= n ? "settings-rate-star--on" : ""}`}
                   aria-label={`${n}`}
                 >
                   ★
                 </button>
               ))}
             </div>
-            <div className="mt-5 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setRateOpen(false)}
-                className="flex-1 cursor-pointer rounded-xl border border-[var(--stroke)] px-3 py-2.5 text-sm"
-              >
+            <div className="settings-rate-card__actions">
+              <button type="button" onClick={() => setRateOpen(false)} className="settings-rate-btn">
                 {t.settings.cancel}
               </button>
               <button
                 type="button"
                 disabled={rating < 1}
                 onClick={submitRating}
-                className="flex-1 cursor-pointer rounded-xl bg-[var(--accent)] px-3 py-2.5 text-sm font-medium text-white transition duration-200 hover:bg-[var(--accent-strong)] disabled:opacity-50"
+                className="settings-rate-btn settings-rate-btn--primary"
               >
                 {t.settings.sendRating}
               </button>
@@ -217,36 +233,114 @@ export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
   );
 }
 
-function MenuSection(props: { label: string; children: React.ReactNode }) {
+function MenuLink(props: {
+  href: string;
+  icon: GlyphName;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="px-1 py-1">
-      <p className="px-2 pb-1 text-[11px] text-[var(--muted)]">{props.label}</p>
-      {props.children}
-    </div>
+    <Link href={props.href} role="menuitem" className="settings-menu-item" onClick={props.onClick}>
+      <MenuGlyph name={props.icon} />
+      <span>{props.children}</span>
+    </Link>
   );
 }
 
-function itemClass(active: boolean) {
-  return `block w-full cursor-pointer px-3 py-2.5 text-start transition duration-200 ${
-    active
-      ? "bg-[var(--bubble)] font-medium text-[var(--accent)]"
-      : "text-[var(--ink)] hover:bg-[var(--chip)]"
-  }`;
+function MenuButton(props: {
+  icon: GlyphName;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button type="button" role="menuitem" className="settings-menu-item" onClick={props.onClick}>
+      <MenuGlyph name={props.icon} />
+      <span>{props.children}</span>
+    </button>
+  );
 }
 
-function SettingsIcon() {
+type GlyphName = "shield" | "doc" | "info" | "admin" | "report" | "star" | "logout";
+
+function MenuGlyph(props: { name: GlyphName }) {
+  const common = {
+    width: 16,
+    height: 16,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+
+  switch (props.name) {
+    case "shield":
+      return (
+        <svg {...common}>
+          <path d="M12 3 5 6v6c0 4 3 7 7 9 4-2 7-5 7-9V6l-7-3Z" />
+        </svg>
+      );
+    case "doc":
+      return (
+        <svg {...common}>
+          <path d="M8 4h6l4 4v12H8V4Z" />
+          <path d="M14 4v4h4" />
+        </svg>
+      );
+    case "info":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 10v6M12 7h.01" />
+        </svg>
+      );
+    case "admin":
+      return (
+        <svg {...common}>
+          <path d="M12 3 4 7v6c0 4.5 3.5 8 8 9 4.5-1 8-4.5 8-9V7l-8-4Z" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+      );
+    case "report":
+      return (
+        <svg {...common}>
+          <path d="M12 8v5M12 16h.01" />
+          <path d="M10.3 4.2 2.6 18a1 1 0 0 0 .9 1.5h16.9a1 1 0 0 0 .9-1.5L13.7 4.2a1 1 0 0 0-1.8 0Z" />
+        </svg>
+      );
+    case "star":
+      return (
+        <svg {...common}>
+          <path d="m12 3 2.2 5.5L20 9.3l-4.5 3.9 1.4 6-5.9-3.4-5.9 3.4 1.4-6L4 9.3l5.8-.8L12 3Z" />
+        </svg>
+      );
+    case "logout":
+      return (
+        <svg {...common}>
+          <path d="M10 7V5a2 2 0 0 1 2-2h6v16h-6a2 2 0 0 1-2-2v-2" />
+          <path d="M14 12H4M7 9l-3 3 3 3" />
+        </svg>
+      );
+  }
+}
+
+function MenuIcon(props: { open: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+      className={`settings-trigger__icon ${props.open ? "settings-trigger__icon--open" : ""}`}
+    >
       <path
-        d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
+        d="M4 7h16M4 12h16M4 17h16"
         stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M19.4 13a7.7 7.7 0 0 0 .05-2l2.05-1.6-2-3.46-2.45.98a7.6 7.6 0 0 0-1.73-1L15 2h-6l-.32 3.92a7.6 7.6 0 0 0-1.73 1L4.5 5.94l-2 3.46L4.55 11a7.7 7.7 0 0 0 0 2l-2.05 1.6 2 3.46 2.45-.98a7.6 7.6 0 0 0 1.73 1L9 22h6l.32-3.92a7.6 7.6 0 0 0 1.73-1l2.45.98 2-3.46L19.4 13Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
+        strokeWidth="2"
+        strokeLinecap="round"
       />
     </svg>
   );
