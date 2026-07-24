@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { Match, Role, StoreData, User } from "@/domain/types";
+import type { AdminSettings, Match, Role, StoreData, User } from "@/domain/types";
 import {
   emptyCandidateCard,
   emptyJobCard,
@@ -169,6 +169,7 @@ async function loadFromTables(pool: Pool): Promise<StoreData> {
             ? new Date(admin.rows[0].updated_at).toISOString()
             : undefined,
           updatedBy: admin.rows[0].updated_by ?? undefined,
+          promptBundleVersion: admin.rows[0].prompt_bundle_version ?? undefined,
         }
       : undefined,
     aiUsage: usage.rows.map((r) => ({
@@ -352,13 +353,14 @@ async function persistStore(client: PoolClient, store: StoreData): Promise<void>
   await client.query(`delete from admin_settings`);
   if (normalized.adminSettings) {
     await client.query(
-      `insert into admin_settings (id, candidate_prompt, employer_prompt, updated_at, updated_by)
-       values ('main', $1, $2, $3, $4)`,
+      `insert into admin_settings (id, candidate_prompt, employer_prompt, updated_at, updated_by, prompt_bundle_version)
+       values ('main', $1, $2, $3, $4, $5)`,
       [
         normalized.adminSettings.candidatePrompt,
         normalized.adminSettings.employerPrompt,
         normalized.adminSettings.updatedAt ?? null,
         normalized.adminSettings.updatedBy ?? null,
+        normalized.adminSettings.promptBundleVersion ?? null,
       ],
     );
   }
@@ -549,4 +551,44 @@ export async function replaceMatches(matches: Match[]): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+/** Targeted admin prompt write — avoids rewriting the full store on each save. */
+export async function upsertAdminSettings(settings: AdminSettings): Promise<void> {
+  if (shouldUseMemoryStore()) {
+    const data = readMemoryStore();
+    writeMemoryStore({ ...data, adminSettings: settings });
+    return;
+  }
+  await ensureSchema();
+  const pool = await getPool();
+  await pool.query(
+    `insert into admin_settings (id, candidate_prompt, employer_prompt, updated_at, updated_by, prompt_bundle_version)
+     values ('main', $1, $2, $3, $4, $5)
+     on conflict (id) do update set
+       candidate_prompt = excluded.candidate_prompt,
+       employer_prompt = excluded.employer_prompt,
+       updated_at = excluded.updated_at,
+       updated_by = excluded.updated_by,
+       prompt_bundle_version = excluded.prompt_bundle_version`,
+    [
+      settings.candidatePrompt,
+      settings.employerPrompt,
+      settings.updatedAt ?? null,
+      settings.updatedBy ?? null,
+      settings.promptBundleVersion ?? null,
+    ],
+  );
+}
+
+export async function deleteAdminSettings(): Promise<void> {
+  if (shouldUseMemoryStore()) {
+    const data = readMemoryStore();
+    const { adminSettings: _removed, ...rest } = data;
+    writeMemoryStore(rest);
+    return;
+  }
+  await ensureSchema();
+  const pool = await getPool();
+  await pool.query(`delete from admin_settings where id = 'main'`);
 }

@@ -48,7 +48,9 @@ export const he: Messages = {
     realUsersTitleOpen: "איך תרצו להמשיך?",
     devSignIn: "כניסה לבדיקות (בלי Google)",
     candidateGoogleHint: "כניסה למועמדים עם חשבון Google.",
+    candidateGoogleButton: "כנס ומצא את העבודה בשבילך",
     employerGoogleHint: "כניסה למעסיקים עם חשבון Google.",
+    employerGoogleButton: "כנס ומצא את העובד המדויק",
   },
   devLogin: {
     title: "כניסה לסביבת פיתוח",

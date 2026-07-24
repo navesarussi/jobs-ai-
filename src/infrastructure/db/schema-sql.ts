@@ -78,7 +78,8 @@ create table if not exists admin_settings (
   candidate_prompt text not null default '',
   employer_prompt text not null default '',
   updated_at timestamptz,
-  updated_by text
+  updated_by text,
+  prompt_bundle_version text
 );
 
 create table if not exists ai_usage (

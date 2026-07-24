@@ -50,10 +50,12 @@ export function getDefaultEmployerPrompt(): string {
 export function resolveAdminSettings(
   raw?: Partial<AdminSettings>,
 ): AdminSettings {
+  const hasStoredPrompts =
+    Boolean(raw?.candidatePrompt?.trim()) && Boolean(raw?.employerPrompt?.trim());
+  const version = raw?.promptBundleVersion;
   const customFresh =
-    Boolean(raw?.candidatePrompt?.trim()) &&
-    Boolean(raw?.employerPrompt?.trim()) &&
-    raw?.promptBundleVersion === PROMPT_BUNDLE_VERSION;
+    hasStoredPrompts &&
+    (version === PROMPT_BUNDLE_VERSION || version == null);
 
   if (customFresh) {
     return {
@@ -76,10 +78,12 @@ export function resolveAdminSettings(
 }
 
 export function hasCustomAdminPrompts(raw?: Partial<AdminSettings>): boolean {
-  return Boolean(
-    raw?.candidatePrompt?.trim() &&
-      raw?.employerPrompt?.trim() &&
-      raw?.promptBundleVersion === PROMPT_BUNDLE_VERSION,
+  const hasStoredPrompts =
+    Boolean(raw?.candidatePrompt?.trim()) && Boolean(raw?.employerPrompt?.trim());
+  const version = raw?.promptBundleVersion;
+  return (
+    hasStoredPrompts &&
+    (version === PROMPT_BUNDLE_VERSION || version == null)
   );
 }
 

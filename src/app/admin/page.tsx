@@ -111,9 +111,14 @@ export default function AdminPage() {
         setError(json.error ?? "שגיאה בשמירה");
         return;
       }
+      if (json.prompts) {
+        setCandidatePrompt(json.prompts.candidatePrompt);
+        setEmployerPrompt(json.prompts.employerPrompt);
+        setIsCustom(Boolean(json.prompts.isCustom));
+        setData((prev) => (prev ? { ...prev, prompts: json.prompts } : prev));
+      }
       setSaved(true);
-      setIsCustom(true);
-      await load();
+      setError(null);
     } finally {
       setSaving(false);
     }

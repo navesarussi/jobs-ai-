@@ -46,7 +46,9 @@ export const en = {
     realUsersTitleOpen: "Choose how you want to continue",
     devSignIn: "Test sign-in (no Google)",
     candidateGoogleHint: "Sign in as a candidate with Google.",
+    candidateGoogleButton: "Enter and find the job for you",
     employerGoogleHint: "Sign in as an employer with Google.",
+    employerGoogleButton: "Enter and find the right candidate",
   },
   devLogin: {
     title: "Development sign-in",

@@ -37,6 +37,8 @@ create index if not exists chat_messages_context_idx
 
 alter table employee_profiles add column if not exists cv jsonb not null default '{}'::jsonb;
 
+alter table admin_settings add column if not exists prompt_bundle_version text;
+
 create table if not exists candidate_document_blobs (
   id text primary key,
   user_id text not null references app_users (id) on delete cascade,

@@ -7,7 +7,7 @@ import {
 } from "./admin";
 import type { StoreData } from "@/domain/types";
 import { emptyCandidateCard, emptyJobCard, PROMPT_BUNDLE_VERSION } from "@/domain/types";
-import { resolveAdminSettings } from "@/infrastructure/ai/prompts";
+import { hasCustomAdminPrompts, resolveAdminSettings } from "@/infrastructure/ai/prompts";
 
 function emptyStore(): StoreData {
   return {
@@ -48,5 +48,14 @@ describe("admin prompts live override", () => {
     });
     assert.equal(/OLD CUSTOM/.test(stale.candidatePrompt), false);
     assert.equal(stale.promptBundleVersion, PROMPT_BUNDLE_VERSION);
+  });
+
+  it("keeps legacy DB overrides saved before prompt_bundle_version column", () => {
+    const legacy = resolveAdminSettings({
+      candidatePrompt: "LEGACY CUSTOM",
+      employerPrompt: "LEGACY EMPLOYER",
+    });
+    assert.match(legacy.candidatePrompt, /LEGACY CUSTOM/);
+    assert.equal(hasCustomAdminPrompts({ candidatePrompt: "LEGACY CUSTOM", employerPrompt: "LEGACY EMPLOYER" }), true);
   });
 });

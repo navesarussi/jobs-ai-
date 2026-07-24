@@ -55,12 +55,14 @@ export function RoleLandingPage(props: { role: Role; initialFlags?: SessionFlags
           enterLabel: t.home.iAmEmployee,
           openHint: t.home.openAuthHint,
           googleHint: t.home.candidateGoogleHint,
+          googleButton: t.home.candidateGoogleButton,
         }
       : {
           description: t.home.employerDescription,
           enterLabel: t.home.iAmEmployer,
           openHint: t.home.employerOpenAuthHint,
           googleHint: t.home.employerGoogleHint,
+          googleButton: t.home.employerGoogleButton,
         };
 
   async function loadFlags() {
@@ -219,7 +221,7 @@ export function RoleLandingPage(props: { role: Role; initialFlags?: SessionFlags
                     }
                     className="cta-glow brand-gradient-bg w-full border-0 py-4 text-base hover:bg-transparent hover:brightness-105"
                   >
-                    {t.home.googleSignIn}
+                    {copy.googleButton}
                   </Button>
                   <p className="text-center text-xs leading-5 text-[var(--muted)]">
                     {copy.googleHint}

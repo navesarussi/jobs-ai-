@@ -5,8 +5,12 @@ import {
   updateAdminPrompts,
 } from "@/application/admin";
 import { assertAdmin } from "@/infrastructure/admin-guard";
+import {
+  deleteAdminSettings,
+  upsertAdminSettings,
+} from "@/infrastructure/db/normalized-store";
 import { ok, fail } from "@/infrastructure/http";
-import { readStore, updateStore } from "@/infrastructure/store";
+import { readStore } from "@/infrastructure/store";
 
 export async function GET() {
   try {
@@ -34,19 +38,17 @@ export async function PUT(req: Request) {
       return ok({ error: "שני הפרומפטים נדרשים" }, { status: 400 });
     }
 
-    // Atomic-ish merge so concurrent chat writes don't drop prompt saves.
-    const next = await updateStore((store) =>
-      updateAdminPrompts(store, {
-        candidatePrompt: body.candidatePrompt!,
-        employerPrompt: body.employerPrompt!,
-        updatedBy: gate.email,
-      }),
-    );
-    return ok({
-      ok: true,
-      updatedAt: next.adminSettings?.updatedAt,
-      isCustom: true,
-    });
+    const store = await readStore();
+    const adminSettings = updateAdminPrompts(store, {
+      candidatePrompt: body.candidatePrompt!,
+      employerPrompt: body.employerPrompt!,
+      updatedBy: gate.email,
+    }).adminSettings!;
+
+    await upsertAdminSettings(adminSettings);
+
+    const prompts = getAdminDashboard({ ...store, adminSettings }).prompts;
+    return ok({ ok: true, prompts, isCustom: true });
   } catch (e) {
     return fail(e);
   }
@@ -58,9 +60,11 @@ export async function DELETE() {
     const gate = await assertAdmin();
     if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 
-    await updateStore((store) => resetAdminPrompts(store));
+    await deleteAdminSettings();
     const defaults = defaultPromptSnapshot();
-    return ok({ ok: true, prompts: defaults, isCustom: false });
+    const store = await readStore();
+    const prompts = getAdminDashboard({ ...store, adminSettings: undefined }).prompts;
+    return ok({ ok: true, prompts, isCustom: false });
   } catch (e) {
     return fail(e);
   }
