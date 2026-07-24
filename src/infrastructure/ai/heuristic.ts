@@ -3,17 +3,6 @@ import { nextMissingCandidateField, nextMissingJobField } from "@/domain/card-pr
 import type { CandidateCard, ChatMessage, FieldQuestion, JobCard } from "@/domain/types";
 import type { CandidatePatch, IntakeResult, JobPatch } from "./schemas";
 
-function pickFlexibility(text: string): number | undefined {
-  const m = text.match(/(?:גמיש(?:ות)?|flexibility)\s*[:=]?\s*(\d{1,2})/i);
-  if (m) {
-    const n = Number(m[1]);
-    if (n >= 1 && n <= 10) return n;
-  }
-  if (/גמיש מאוד|מאוד גמיש|לא אכפת|פתוח לכל/.test(text)) return 2;
-  if (/מדויק|בלי פשרות|רק אם מתאים בדיוק|חשוב לי שיהיה מדויק/.test(text)) return 9;
-  return undefined;
-}
-
 function extractList(text: string, label: RegExp): string[] {
   const m = text.match(label);
   if (!m?.[1]) return [];
@@ -88,8 +77,6 @@ function extractCandidatePatch(message: string, card: CandidateCard): CandidateP
   if (/ניהול|צוות/.test(lower)) patch.managementExperience = message.slice(0, 100);
   if (/לא מוכן|בלי|קו אדום|לא אסכים/.test(lower)) patch.dealBreakers = message.slice(0, 120);
   if (message.trim().length > 40) patch.narrative = message.trim().slice(0, 400);
-  const flex = pickFlexibility(lower);
-  if (flex) patch.flexibility = flex;
   return patch;
 }
 
@@ -151,7 +138,6 @@ const CANDIDATE_FOLLOWUPS: Record<string, string> = {
   personality: "איך היית מתאר/ת את עצמך עם צוות או מול לקוחות?",
   salaryExpectation: "מה בערך ציפיית השכר שלך?",
   interviewAvailability: "מתי בדרך כלל נוח לך לראיון?",
-  flexibility: "כמה חשוב לך שהמשרה תתאים בדיוק, או שיש גמישות?",
   dealBreakers: "יש משהו שהוא קו אדום מבחינתך?",
   shiftPreference: "יש העדפה למשמרות — בוקר, ערב, לילה?",
   transportation: "איך את/ה בדרך כלל מגיע/ה לעבודה?",

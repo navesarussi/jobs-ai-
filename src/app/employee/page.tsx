@@ -26,6 +26,7 @@ export default function EmployeePage() {
     pendingQuestions: { id: string; question: string }[];
     hasCv?: boolean;
     cvFileName?: string | null;
+    cvExtractionStatus?: "pending" | "ok" | "partial" | "failed" | null;
     error?: string;
   } | null>(null);
   const [jobs, setJobs] = useState([]);
@@ -131,6 +132,10 @@ export default function EmployeePage() {
             title={t.fileImport.cvTitle}
             hint={t.fileImport.cvHint}
             minimalSummary
+            cvMode
+            hasExisting={hasCv}
+            existingFileName={me?.cvFileName}
+            pendingAnalysis={me?.cvExtractionStatus === "pending"}
             onDone={() => void refresh(userId)}
           />
           <CandidateProfileStrip

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FlexibilitySlider } from "@/components/FlexibilitySlider";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { candidateMiniCardLines } from "@/domain/candidate-mini-card";
 import { candidateRows, knowledgePercent } from "@/domain/card-progress";
@@ -42,6 +41,87 @@ function MetricBar(props: {
   );
 }
 
+function FlexibilityBar(props: {
+  userId: string;
+  label: string;
+  valueLabel: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [local, setLocal] = useState(clampFlex(props.value));
+  const pending = useRef<number | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setLocal(clampFlex(props.value));
+  }, [props.value]);
+
+  function scheduleSave(next: number) {
+    pending.current = next;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      void flush();
+    }, 280);
+  }
+
+  async function flush() {
+    const value = pending.current;
+    pending.current = null;
+    if (value == null) return;
+    try {
+      const res = await fetch("/api/flexibility", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: props.userId, value }),
+      });
+      const data = (await res.json()) as { flexibility?: number; error?: string };
+      if (data.flexibility != null) {
+        props.onChange(data.flexibility);
+        setLocal(data.flexibility);
+      }
+    } catch {
+      /* keep local value */
+    }
+  }
+
+  const percent = Math.round((local / 10) * 100);
+
+  return (
+    <div
+      className="relative min-w-0 flex-1"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <div className="mb-1 flex items-center justify-between gap-2 text-[10px] text-[var(--muted)]">
+        <span className="truncate">{props.label}</span>
+        <span className="shrink-0 font-medium text-[var(--ink)]">{props.valueLabel}</span>
+      </div>
+      <div className="relative h-1.5 cursor-pointer rounded-full bg-[var(--chip)]">
+        <div
+          className="pointer-events-none absolute inset-y-0 start-0 rounded-full bg-[var(--sky)] transition-[width] duration-150"
+          style={{ width: `${percent}%` }}
+        />
+        <input
+          type="range"
+          min={1}
+          max={10}
+          step={1}
+          value={local}
+          aria-label={t.flexibility.title}
+          onChange={(e) => {
+            const next = clampFlex(Number(e.target.value));
+            setLocal(next);
+            props.onChange(next);
+            scheduleSave(next);
+          }}
+          className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent opacity-0"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function CandidateProfileStrip(props: {
   userId: string;
   card: CandidateCard | null | undefined;
@@ -59,7 +139,6 @@ export function CandidateProfileStrip(props: {
   const labels = t.cardFields.candidate as Record<string, string>;
   const rows = candidateRows(card, labels);
   const knowledge = knowledgePercent(rows);
-  const flexPercent = Math.round((flex / 10) * 100);
   const miniLines = candidateMiniCardLines(card, labels);
 
   function onFlex(value: number) {
@@ -69,28 +148,31 @@ export function CandidateProfileStrip(props: {
 
   return (
     <section className="panel rounded-[1rem] px-3 py-2.5">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full cursor-pointer items-center gap-2 text-start"
-        aria-expanded={open}
-      >
-        <span className="shrink-0 text-xs font-semibold text-[var(--hero)]">{t.profile.yourCard}</span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex shrink-0 cursor-pointer items-center gap-1.5 text-start"
+          aria-expanded={open}
+        >
+          <span className="text-xs font-semibold text-[var(--hero)]">{t.profile.yourCard}</span>
+          <span className="text-[10px] text-[var(--muted)]">{open ? "▲" : "▼"}</span>
+        </button>
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
           <MetricBar
             label={t.profile.knowledge}
             valueLabel={fmtPercent(t.profile.knowledgePercent, knowledge)}
             percent={knowledge}
           />
-          <MetricBar
+          <FlexibilityBar
+            userId={props.userId}
             label={t.profile.flexibility}
             valueLabel={fmtFlex(t.profile.flexibilityValue, flex)}
-            percent={flexPercent}
-            tone="sky"
+            value={flex}
+            onChange={onFlex}
           />
         </div>
-        <span className="shrink-0 text-[10px] text-[var(--muted)]">{open ? "▲" : "▼"}</span>
-      </button>
+      </div>
 
       {open ? (
         <div className="mt-3 border-t border-[var(--stroke)] pt-3">
@@ -107,9 +189,6 @@ export function CandidateProfileStrip(props: {
           ) : (
             <p className="text-xs text-[var(--muted)]">{t.profile.miniCardEmpty}</p>
           )}
-          <div className="mt-3 border-t border-[var(--stroke)] pt-2">
-            <FlexibilitySlider userId={props.userId} value={flex} onChange={onFlex} />
-          </div>
         </div>
       ) : null}
     </section>

@@ -184,7 +184,7 @@ export type CandidateDocument = {
   uploadedAt: string;
   textCharCount: number;
   extractedText: string;
-  extractionStatus?: "ok" | "partial" | "failed";
+  extractionStatus?: "pending" | "ok" | "partial" | "failed";
 };
 
 export type CandidateCvProfile = {
