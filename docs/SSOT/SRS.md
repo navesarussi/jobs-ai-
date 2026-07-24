@@ -38,6 +38,8 @@ Match employers and candidates **without search**. Agents extract rich profiles 
 | FR-CHAT-06 | Primary goal of chat: understand **as much as possible**, especially **personality / character / vibe**, not just hard skills |
 | FR-CHAT-07 | Secondary goal: enable **fast + high-quality matches** |
 | FR-CHAT-08 | For employers: optimize toward finding a **near-perfect fit** for that job |
+| FR-CHAT-09 | Candidate agent resolves open contradictions (CV vs chat, chat vs chat) naturally, one thread at a time, without mentioning scores or “reliability” |
+| FR-CHAT-10 | Candidate agent confirms or discards low-confidence CV inferences; resolutions update hidden reliability |
 
 ### FR-MATCH
 - Rank candidates for employers; show employer-approved jobs to candidates only
@@ -77,6 +79,13 @@ Design: `docs/superpowers/specs/2026-07-23-cv-deep-analysis-design.md`
 | FR-CV-03 | Field provenance is retained; conflicting values from CV vs existing data are both kept; the candidate agent clarifies which value is current in chat (no silent overwrite) |
 | FR-CV-04 | After upload, the candidate sees only a minimal summary that data was captured — not the full rich card (aligns with FR-UI-07) |
 | FR-CV-05 | Admins may always view/download a candidate CV; employers may view/download only for candidates matched to their job (`queued` or `approved`) |
+| FR-CV-06 | Controlled subtext inference with grounded evidence + confidence; high/medium may fill empty card fields; low waits for chat confirmation (policy C) |
+| FR-CV-07 | Extraction quality gates reject repetitive/garbage text before it reaches the candidate card |
+| FR-CV-08 | Work/education histories and mapped CV facts populate the full candidate card; the candidate mini-card remains a safe subset |
+| FR-CV-09 | Each candidate has a hidden reliability score (0–100) plus contradiction notes (CV vs chat, chat vs chat, CV-internal); candidates never see this |
+| FR-CV-10 | Knowledge % reflects fields filled from CV/chat on the full card, including non-empty work/education histories |
+
+Design (subtext + reliability): `docs/superpowers/specs/2026-07-24-cv-subtext-reliability-design.md`
 
 ## Non-goals (current POC)
 
