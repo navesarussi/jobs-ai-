@@ -13,6 +13,12 @@ import { applyChatRowsToStore, type RawChatRow } from "./chat-messages";
 import { ensureSchema } from "./schema";
 import { getPool } from "./pool";
 import { readMemoryStore, shouldUseMemoryStore } from "./memory-store";
+import {
+  getCachedAdminSettings,
+  getCachedFieldQuestions,
+  setCachedAdminSettings,
+  setCachedFieldQuestions,
+} from "./store-cache";
 
 function mapUser(u: Record<string, unknown>): User {
   return {
@@ -127,6 +133,10 @@ export async function readActorStore(userId: string): Promise<StoreData> {
   if (shouldUseMemoryStore()) return filterMemoryActor(userId);
   await ensureSchema();
   const pool = await getPool();
+
+  const cachedQuestions = getCachedFieldQuestions();
+  const cachedAdmin = getCachedAdminSettings();
+
   const [users, employees, employers, chats, questions, answers, admin] = await Promise.all([
     pool.query(`select * from app_users where id = $1 limit 1`, [userId]),
     pool.query(`select * from employee_profiles where user_id = $1 limit 1`, [userId]),
@@ -135,18 +145,29 @@ export async function readActorStore(userId: string): Promise<StoreData> {
       `select * from chat_messages where owner_user_id = $1 order by created_at`,
       [userId],
     ),
-    pool.query(`select * from field_questions order by created_at`),
+    cachedQuestions
+      ? Promise.resolve({ rows: [] as Record<string, unknown>[] })
+      : pool.query(`select * from field_questions order by created_at`),
     pool.query(`select * from field_answers where candidate_id = $1`, [userId]),
-    pool.query(`select * from admin_settings where id = 'main' limit 1`),
+    cachedAdmin !== undefined
+      ? Promise.resolve({ rows: [] as Record<string, unknown>[] })
+      : pool.query(`select * from admin_settings where id = 'main' limit 1`),
   ]);
+
+  const fieldQuestions = cachedQuestions ?? questions.rows.map((q) => mapQuestion(q));
+  if (!cachedQuestions) setCachedFieldQuestions(fieldQuestions);
+
+  const adminSettings =
+    cachedAdmin !== undefined ? cachedAdmin ?? undefined : mapAdmin(admin.rows[0]);
+  if (cachedAdmin === undefined) setCachedAdminSettings(adminSettings);
 
   const base = emptyStore({
     users: users.rows.map((u) => mapUser(u)),
     employees: employees.rows.map((e) => mapEmployee(e, true)),
     employers: employers.rows.map((e) => mapEmployer(e)),
-    fieldQuestions: questions.rows.map((q) => mapQuestion(q)),
+    fieldQuestions,
     fieldAnswers: answers.rows.map((a) => mapAnswer(a)),
-    adminSettings: mapAdmin(admin.rows[0]),
+    adminSettings,
   });
   return applyChatRowsToStore(base, chats.rows as RawChatRow[]);
 }

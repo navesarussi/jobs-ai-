@@ -1,6 +1,4 @@
-import { randomUUID } from "crypto";
 import { NotFoundError } from "@/domain/errors";
-import { createAiUsageRecord } from "@/domain/admin";
 import {
   getActiveJob,
   normalizeEmployerRecord,
@@ -8,186 +6,60 @@ import {
   withActiveJob,
 } from "@/domain/employer-jobs";
 import {
-  mergeAnswerIntoCard,
-  unansweredQuestionsForCandidate,
-} from "@/domain/field-questions";
-import {
-  formatPendingConflictsForPrompt,
   mergeCvIntoEmployee,
-  resolveConflictsFromPatch,
   type CvImportSummary,
   type CvPatchInput,
 } from "@/domain/cv-merge";
 import type {
-  AiUsageRecord,
   CandidateCard,
-  CandidateCvProfile,
   CandidateDocument,
-  ChatMessage,
-  FieldAnswer,
   JobCard,
   StoreData,
 } from "@/domain/types";
 import { runEmployeeIntake, runEmployerIntake } from "@/infrastructure/ai/intake";
-import { resolveAdminSettings } from "@/infrastructure/ai/prompts";
-import type { AiTokenUsage, CandidatePatch, JobPatch } from "@/infrastructure/ai/schemas";
+import type { JobPatch } from "@/infrastructure/ai/schemas";
+import {
+  applyEmployeeTurn,
+  applyEmployerTurn,
+  applyJobPatch,
+  prepareEmployeeTurn,
+  prepareEmployerTurn,
+  type ChatTurnResult,
+} from "./chat-turn";
 
-function applyCandidatePatch(card: CandidateCard, patch?: CandidatePatch): CandidateCard {
-  if (!patch) return card;
-  return {
-    ...card,
-    ...patch,
-    skills: patch.skills ?? card.skills,
-    softSkills: patch.softSkills ?? card.softSkills,
-    languages: patch.languages ?? card.languages,
-    extras: { ...card.extras, ...(patch.extras ?? {}) },
-    flexibility: card.flexibility,
-    experienceYears:
-      patch.experienceYears !== undefined ? patch.experienceYears : card.experienceYears,
-  };
-}
-
-function applyJobPatch(card: JobCard, patch?: JobPatch): JobCard {
-  if (!patch) return card;
-  return {
-    ...card,
-    ...patch,
-    mustHaves: patch.mustHaves ?? card.mustHaves,
-    niceToHaves: patch.niceToHaves ?? card.niceToHaves,
-    requiredLanguages: patch.requiredLanguages ?? card.requiredLanguages,
-    interviewSlots: patch.interviewSlots ?? card.interviewSlots,
-    extras: { ...card.extras, ...(patch.extras ?? {}) },
-  };
-}
-
-function makeMessage(role: "user" | "assistant", content: string): ChatMessage {
-  return {
-    id: randomUUID(),
-    role,
-    content,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-function buildUsageRecord(
-  type: AiUsageRecord["type"],
-  usage?: AiTokenUsage,
-): AiUsageRecord | undefined {
-  if (!usage) return undefined;
-  return createAiUsageRecord({
-    id: randomUUID(),
-    type,
-    promptTokens: usage.promptTokens,
-    completionTokens: usage.completionTokens,
-    createdAt: new Date().toISOString(),
-  });
-}
-
-export type ChatTurnResult = {
-  store: StoreData;
-  reply: string;
-  provider: string;
-  aiDegraded?: boolean;
-  card: CandidateCard | JobCard;
-  chat: ChatMessage[];
-  pendingQuestions: { id: string; question: string }[];
-  jobId?: string;
-  /** Deltas for scoped persistence (avoid whole-DB rewrite). */
-  newMessages: ChatMessage[];
-  newFieldAnswers: FieldAnswer[];
-  usageRecord?: AiUsageRecord;
-  cv?: CandidateCvProfile;
-};
+export type { ChatTurnResult } from "./chat-turn";
+export {
+  applyEmployeeTurn,
+  applyEmployerTurn,
+  prepareEmployeeTurn,
+  prepareEmployerTurn,
+} from "./chat-turn";
 
 export async function handleEmployeeChat(
   store: StoreData,
   userId: string,
   message: string,
 ): Promise<ChatTurnResult> {
-  const emp = store.employees.find((e) => e.userId === userId);
-  if (!emp) throw new NotFoundError("Employee");
-
-  const pending = unansweredQuestionsForCandidate(
-    emp.card,
-    store.fieldQuestions,
-    store.fieldAnswers,
-    userId,
-  );
-
-  const prompts = resolveAdminSettings(store.adminSettings);
+  const prep = prepareEmployeeTurn(store, userId);
   const intake = await runEmployeeIntake({
     message,
-    card: emp.card,
-    chat: emp.chat,
-    pendingQuestions: pending,
-    systemPrompt: prompts.candidatePrompt,
-    pendingConflicts: formatPendingConflictsForPrompt(emp.cv),
+    card: prep.card,
+    chat: prep.chat,
+    pendingQuestions: prep.pendingQuestions,
+    systemPrompt: prep.systemPrompt,
+    pendingConflicts: prep.pendingConflicts,
   });
-
-  let card = applyCandidatePatch(emp.card, intake.candidatePatch);
-  const cv = resolveConflictsFromPatch(emp.cv, intake.candidatePatch ?? {});
-  let answers = store.fieldAnswers;
-  let pendingIds = emp.pendingFieldQuestionIds;
-  const newFieldAnswers: FieldAnswer[] = [];
-
-  for (const fa of intake.fieldAnswers ?? []) {
-    const q = store.fieldQuestions.find((x) => x.id === fa.questionId);
-    if (!q) continue;
-    card = mergeAnswerIntoCard(card, q, fa.answer);
-    const answer: FieldAnswer = {
-      questionId: fa.questionId,
-      candidateId: userId,
-      answer: fa.answer,
-      answeredAt: new Date().toISOString(),
-    };
-    answers = [
-      ...answers.filter(
-        (a) => !(a.questionId === fa.questionId && a.candidateId === userId),
-      ),
-      answer,
-    ];
-    newFieldAnswers.push(answer);
-    pendingIds = pendingIds.filter((id) => id !== fa.questionId);
-  }
-
-  const newMessages = [makeMessage("user", message), makeMessage("assistant", intake.reply)];
-  const usageRecord = buildUsageRecord("employee_intake", intake.usage);
-
-  const next: StoreData = {
-    ...store,
-    fieldAnswers: answers,
-    aiUsage: usageRecord
-      ? [...(store.aiUsage ?? []), usageRecord].slice(-200)
-      : store.aiUsage,
-    employees: store.employees.map((e) =>
-      e.userId === userId
-        ? {
-            ...e,
-            card,
-            cv,
-            pendingFieldQuestionIds: pendingIds,
-            chat: [...e.chat, ...newMessages],
-          }
-        : e,
-    ),
-  };
-  const empNext = next.employees.find((e) => e.userId === userId)!;
-  const pendingOut = next.fieldQuestions.filter((q) =>
-    empNext.pendingFieldQuestionIds.includes(q.id),
-  );
-  return {
-    store: next,
+  return applyEmployeeTurn({
+    store,
+    userId,
+    message,
     reply: intake.reply,
+    candidatePatch: intake.candidatePatch,
+    fieldAnswers: intake.fieldAnswers,
+    usage: intake.usage,
     provider: intake.provider,
     aiDegraded: intake.degraded,
-    card: empNext.card,
-    chat: empNext.chat,
-    pendingQuestions: pendingOut.map((q) => ({ id: q.id, question: q.question })),
-    newMessages,
-    newFieldAnswers,
-    usageRecord,
-    cv,
-  };
+  });
 }
 
 export async function handleEmployerChat(
@@ -196,48 +68,24 @@ export async function handleEmployerChat(
   message: string,
   jobId?: string,
 ): Promise<ChatTurnResult> {
-  const raw = store.employers.find((e) => e.userId === userId);
-  if (!raw) throw new NotFoundError("Employer");
-
-  let employer = normalizeEmployerRecord(raw);
-  if (jobId) employer = withActiveJob(employer, jobId);
-  const active = getActiveJob(employer);
-
-  const prompts = resolveAdminSettings(store.adminSettings);
+  const prep = prepareEmployerTurn(store, userId, jobId);
   const intake = await runEmployerIntake({
     message,
-    card: active.card,
-    chat: active.chat,
-    systemPrompt: prompts.employerPrompt,
+    card: prep.card,
+    chat: prep.chat,
+    systemPrompt: prep.systemPrompt,
   });
-
-  const card = applyJobPatch(active.card, intake.jobPatch);
-  const newMessages = [makeMessage("user", message), makeMessage("assistant", intake.reply)];
-  const chat = [...active.chat, ...newMessages];
-  const updated = updateJobSlot(employer, active.id, { card, chat });
-  const mirrored = withActiveJob(updated, active.id);
-  const usageRecord = buildUsageRecord("employer_intake", intake.usage);
-
-  const next: StoreData = {
-    ...store,
-    aiUsage: usageRecord
-      ? [...(store.aiUsage ?? []), usageRecord].slice(-200)
-      : store.aiUsage,
-    employers: store.employers.map((e) => (e.userId === userId ? mirrored : e)),
-  };
-  return {
-    store: next,
+  return applyEmployerTurn({
+    store,
+    userId,
+    message,
     reply: intake.reply,
+    jobPatch: intake.jobPatch,
+    usage: intake.usage,
     provider: intake.provider,
     aiDegraded: intake.degraded,
-    card,
-    chat,
-    pendingQuestions: [],
-    jobId: active.id,
-    newMessages,
-    newFieldAnswers: [],
-    usageRecord,
-  };
+    jobId: prep.jobId,
+  });
 }
 
 /** Apply a deep CV extraction: merge into card + provenance; keep raw text on the document. */
