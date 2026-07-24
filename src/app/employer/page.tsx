@@ -112,7 +112,7 @@ export default function EmployerPage() {
       <main className="mx-auto max-w-lg px-5 py-16 text-center">
         <SettingsMenu />
         <p className="text-[var(--muted)]">{t.session.noActiveSession}</p>
-        <Link href="/" className="mt-4 inline-block text-[var(--accent)]">
+        <Link href="/for-employers" className="mt-4 inline-block text-[var(--accent)]">
           {t.session.backToStart}
         </Link>
       </main>
@@ -124,6 +124,7 @@ export default function EmployerPage() {
       <WorkspaceHeader
         name={name}
         subtitle={t.employer.subtitle}
+        homeHref="/for-employers"
         tabs={
           <>
             <SettingsMenu variant="inline" />

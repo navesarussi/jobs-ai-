@@ -2,11 +2,11 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Locale } from "@/i18n/types";
 import { AppVersionBadge } from "@/components/AppVersion";
-import { clearSessionOnLogout } from "@/lib/client-session";
+import { clearSessionOnLogout, roleLandingPath } from "@/lib/client-session";
 import { signOut } from "next-auth/react";
 
 export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
@@ -15,6 +15,7 @@ export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
     variant === "inline" ? "relative z-50" : "fixed top-3 end-3 z-50 sm:top-4 sm:end-4";
   const { t, locale, setLocale } = useTranslation();
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
   const [rating, setRating] = useState(0);
@@ -77,9 +78,15 @@ export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
     } catch {
       // Open-auth / no Google session — local clear is enough.
     }
-    router.push("/");
+    router.push(
+      pathname.startsWith("/employer") || pathname.startsWith("/for-employers")
+        ? roleLandingPath("employer")
+        : roleLandingPath("employee"),
+    );
     router.refresh();
   }
+
+  const menuAlignClass = variant === "inline" ? "start-0" : "end-0";
 
   return (
     <div ref={rootRef} className={wrapClass}>
@@ -99,7 +106,7 @@ export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
         <div
           id={menuId}
           role="menu"
-          className="panel absolute end-0 top-12 max-h-[80vh] w-72 overflow-y-auto rounded-2xl py-1 text-sm"
+          className={`panel absolute top-12 ${menuAlignClass} z-[60] max-h-[80vh] w-72 max-w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto rounded-2xl py-1 text-sm shadow-[var(--shadow-soft)]`}
         >
           <p className="px-3 py-2 text-[11px] font-semibold tracking-wide text-[var(--muted)] uppercase">
             {t.settings.title}

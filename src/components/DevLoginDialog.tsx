@@ -11,10 +11,12 @@ type DevUser = { id: string; name: string; role: Role; email?: string };
 export function DevLoginDialog(props: {
   open: boolean;
   users: DevUser[];
+  defaultRole?: Role;
   onClose: () => void;
   onDone: (redirect: string) => void;
   onError: (message: string) => void;
 }) {
+  const defaultRole = props.defaultRole ?? "employee";
   const { t } = useTranslation();
   const titleId = useId();
   const [mode, setMode] = useState<"admin" | "existing" | "new">("new");
@@ -37,6 +39,7 @@ export function DevLoginDialog(props: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode,
+          role: defaultRole,
           userId: mode === "existing" ? userId : undefined,
           name: mode === "new" ? name : undefined,
           deviceId: getOrCreateDeviceId(),

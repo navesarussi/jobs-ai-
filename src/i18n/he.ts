@@ -18,6 +18,8 @@ export const he: Messages = {
     tagline: "There is another way",
     description:
       "שיחה טבעית עם סוכן השמה חכם. הוא מבין אתכם לעומק, משדך בדיוק, ומציג לכם רק משרות שאושרו עבורכם.",
+    employerDescription:
+      "שיחה טבעית עם סוכן גיוס חכם. הוא מבין את המשרה והארגון, ומציג מועמדים מתאימים לפי התאמה אמיתית.",
     googleSignIn: "כניסה עם Google",
     connectedAs: "מחובר/ת כ־{name}",
     continueAsEmployee: "המשך כמחפש/ת עבודה",
@@ -40,6 +42,8 @@ export const he: Messages = {
     demoEmployerDev: "דמו מעסיק/ה (פיתוח בלבד)",
     adminPortal: "פורטל מנהלים",
     openAuthHint: "התחברות Google מושהית כרגע — התחילו לצ׳אט כמועמדים.",
+    employerOpenAuthHint: "התחברות Google מושהית כרגע — התחילו לצ׳אט כמעסיקים.",
+    employerAfterSignInHint: "אחרי התחברות ממשיכים כמעסיקים.",
     openingRole: "פותחים את המסך שלכם…",
     realUsersTitleOpen: "איך תרצו להמשיך?",
     devSignIn: "כניסה לבדיקות (בלי Google)",

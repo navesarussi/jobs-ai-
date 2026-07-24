@@ -16,6 +16,8 @@ export const en = {
     tagline: "There is another way",
     description:
       "A natural conversation with a smart placement agent. It understands you deeply, matches with precision, and shows you only the jobs that approved you.",
+    employerDescription:
+      "A natural conversation with a smart hiring agent. It understands the role and your company, and surfaces candidates who truly fit.",
     googleSignIn: "Sign in with Google",
     connectedAs: "Signed in as {name}",
     continueAsEmployee: "Continue as job seeker",
@@ -38,6 +40,8 @@ export const en = {
     demoEmployerDev: "Employer demo (dev only)",
     adminPortal: "Admin portal",
     openAuthHint: "Google sign-in is paused — start chatting as a candidate.",
+    employerOpenAuthHint: "Google sign-in is paused — start chatting as an employer.",
+    employerAfterSignInHint: "After signing in, continue as an employer.",
     openingRole: "Opening your screen…",
     realUsersTitleOpen: "Choose how you want to continue",
     devSignIn: "Test sign-in (no Google)",

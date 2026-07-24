@@ -77,6 +77,10 @@ export function roleHomePath(role: Role): string {
   return role === "employee" ? "/employee" : "/employer";
 }
 
+export function roleLandingPath(role: Role): string {
+  return role === "employee" ? "/" : "/for-employers";
+}
+
 export async function startRoleSession(role: Role): Promise<{
   id: string;
   name: string;
