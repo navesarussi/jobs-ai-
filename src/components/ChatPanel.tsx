@@ -26,6 +26,7 @@ export function ChatPanel(props: {
   initialMessages: Msg[];
   placeholder: string;
   jobId?: string;
+  blockedReason?: string;
   onTurn?: (payload: ChatTurnPayload) => void;
   onReset?: () => void;
 }) {
@@ -47,7 +48,7 @@ export function ChatPanel(props: {
 
   async function send() {
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text || busy || props.blockedReason) return;
     setInput("");
     setBusy(true);
     setMessages((m) => [...m, { id: `local-${Date.now()}`, role: "user", content: text }]);
@@ -140,7 +141,7 @@ export function ChatPanel(props: {
           <button
             type="button"
             onClick={() => void resetChat()}
-            disabled={busy}
+            disabled={busy || Boolean(props.blockedReason)}
             className="cursor-pointer rounded-lg bg-white/10 px-2.5 py-1 text-[11px] text-white/90 transition hover:bg-white/20 disabled:opacity-50"
           >
             {t.chat.reset}
@@ -151,7 +152,7 @@ export function ChatPanel(props: {
       <div className="chat-surface__body flex-1 space-y-4 overflow-y-auto px-4 py-5">
         {messages.length === 0 ? (
           <div className="chat-msg mx-auto max-w-md rounded-2xl border border-dashed border-[var(--stroke)] bg-white/60 px-5 py-4 text-center text-sm leading-7 text-[var(--muted)]">
-            {props.role === "employee" ? t.chat.employeeEmptyHint : t.chat.employerEmptyHint}
+            {props.blockedReason ?? (props.role === "employee" ? t.chat.employeeEmptyHint : t.chat.employerEmptyHint)}
           </div>
         ) : null}
         {messages.map((m) => (
@@ -180,6 +181,11 @@ export function ChatPanel(props: {
       </div>
 
       <div className="border-t border-[var(--stroke)] bg-white/80 p-4 backdrop-blur">
+        {props.blockedReason ? (
+          <p className="mb-3 rounded-xl bg-[var(--warn-bg)] px-3 py-2 text-center text-xs leading-5 text-[var(--warn)]">
+            {props.blockedReason}
+          </p>
+        ) : null}
         <div className="flex gap-2">
           <input
             value={input}
@@ -187,12 +193,13 @@ export function ChatPanel(props: {
             onKeyDown={(e) => {
               if (e.key === "Enter") void send();
             }}
-            placeholder={props.placeholder}
-            className="min-h-12 flex-1 rounded-full border border-[var(--stroke)] bg-[var(--chip)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-[var(--accent)]/20"
+            placeholder={props.blockedReason ? t.chat.cvRequiredPlaceholder : props.placeholder}
+            disabled={Boolean(props.blockedReason)}
+            className="min-h-12 flex-1 rounded-full border border-[var(--stroke)] bg-[var(--chip)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <Button
             onClick={() => void send()}
-            disabled={busy}
+            disabled={busy || Boolean(props.blockedReason)}
             className="brand-gradient-bg min-h-12 rounded-full px-6 hover:bg-transparent hover:brightness-105"
           >
             {t.chat.send}

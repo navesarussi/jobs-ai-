@@ -135,6 +135,8 @@ export const en = {
     replyFailed: "Could not get a reply",
     reset: "Reset chat",
     resetConfirm: "Clear this conversation?",
+    cvRequired: "Upload your CV above before starting a chat with the agent.",
+    cvRequiredPlaceholder: "Upload your CV first…",
   },
   fileImport: {
     choose: "Upload a file",
@@ -159,6 +161,9 @@ export const en = {
     knowledgeHint: "0% = no relevant knowledge · 100% = you shared all relevant knowledge",
     pendingQuestions: "{count} field questions are waiting in the chat",
     emptyValue: "—",
+    flexibilityValue: "{value}/10",
+    miniCardHint: "A short preview of your profile — not every internal detail.",
+    miniCardEmpty: "Not enough details yet — continue in chat after uploading your CV.",
   },
   candidates: {
     empty:

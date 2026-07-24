@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { handleEmployeeChat, handleEmployerChat } from "@/application/chat";
 import { refreshStoreMatches } from "@/application/employer-actions";
+import { employeeHasCv } from "@/domain/candidate-mini-card";
 import { ok, fail } from "@/infrastructure/http";
 import { assertActor } from "@/infrastructure/auth-guard";
 import { writeStore, writeMatches } from "@/infrastructure/store";
@@ -30,6 +31,16 @@ export async function POST(req: Request) {
         { error: "התפקיד לא תואם לסשן הפעיל. חזרו למסך הכניסה והתחילו מחדש." },
         { status: 409 },
       );
+    }
+
+    if (role === "employee") {
+      const emp = store.employees.find((e) => e.userId === body.userId);
+      if (!employeeHasCv(emp?.cv)) {
+        return ok(
+          { error: "יש להעלות קורות חיים לפני תחילת השיחה." },
+          { status: 422 },
+        );
+      }
     }
 
     const result =

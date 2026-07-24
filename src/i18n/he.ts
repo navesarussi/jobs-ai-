@@ -137,6 +137,8 @@ export const he: Messages = {
     replyFailed: "לא הצלחתי לענות",
     reset: "איפוס צ׳אט",
     resetConfirm: "לנקות את השיחה הזו?",
+    cvRequired: "העלו קורות חיים למעלה כדי להתחיל שיחה עם הסוכן.",
+    cvRequiredPlaceholder: "קודם מעלים קורות חיים…",
   },
   fileImport: {
     choose: "העלאת קובץ",
@@ -161,6 +163,9 @@ export const he: Messages = {
     knowledgeHint: "0% = אין ידע רלוונטי · 100% = נתת את כל הידע הרלוונטי",
     pendingQuestions: "יש {count} שאלות תחום שמחכות בשיחה",
     emptyValue: "—",
+    flexibilityValue: "{value}/10",
+    miniCardHint: "תצוגה מקוצרת של הפרופיל שלך — לא כל הפרטים הפנימיים.",
+    miniCardEmpty: "עדיין אין מספיק פרטים — המשיכו בשיחה אחרי העלאת קורות החיים.",
   },
   candidates: {
     empty:

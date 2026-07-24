@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { CandidateProfileStrip } from "@/components/CandidateProfileStrip";
 import { ChatPanel, type ChatTurnPayload } from "@/components/ChatPanel";
 import { FileImport } from "@/components/FileImport";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "@/components/LocaleProvider";
 import { OpportunityList } from "@/components/OpportunityList";
-import { ProfileAside } from "@/components/ProfileAside";
 import { WorkspaceHeader } from "@/components/WorkspaceHeader";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { useStoredUser } from "@/lib/use-stored-user";
@@ -24,17 +24,11 @@ export default function EmployeePage() {
     card: unknown;
     chat: { id: string; role: "user" | "assistant" | "system"; content: string }[];
     pendingQuestions: { id: string; question: string }[];
+    hasCv?: boolean;
+    cvFileName?: string | null;
     error?: string;
   } | null>(null);
   const [jobs, setJobs] = useState([]);
-  const [showFullCard, setShowFullCard] = useState(false);
-
-  useEffect(() => {
-    void fetch("/api/session")
-      .then((r) => r.json())
-      .then((d: { isAdmin?: boolean }) => setShowFullCard(Boolean(d.isAdmin)))
-      .catch(() => setShowFullCard(false));
-  }, []);
 
   const refreshLists = useCallback(
     async (id: string) => {
@@ -100,6 +94,8 @@ export default function EmployeePage() {
     );
   }
 
+  const hasCv = Boolean(me?.hasCv);
+
   return (
     <div className="workspace-shell atmosphere">
       <WorkspaceHeader
@@ -128,8 +124,30 @@ export default function EmployeePage() {
       ) : null}
 
       {tab === "chat" ? (
-        <div className="enter-delay grid gap-4 lg:grid-cols-[1fr_300px]">
-          <div className="min-h-[520px]">
+        <div className="enter-delay mx-auto flex max-w-3xl flex-col gap-3">
+          <FileImport
+            userId={userId}
+            endpoint="/api/cv"
+            title={t.fileImport.cvTitle}
+            hint={t.fileImport.cvHint}
+            minimalSummary
+            onDone={() => void refresh(userId)}
+          />
+          <CandidateProfileStrip
+            userId={userId}
+            card={(me?.card as never) ?? null}
+            onFlexibilityChange={(value) => {
+              setMe((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      card: { ...(prev.card as object), flexibility: value },
+                    }
+                  : prev,
+              );
+            }}
+          />
+          <div className="min-h-[480px]">
             <ChatPanel
               key={`${userId}-employee`}
               userId={userId}
@@ -137,34 +155,8 @@ export default function EmployeePage() {
               locale={locale}
               initialMessages={me?.chat ?? []}
               placeholder={t.employee.chatPlaceholder}
+              blockedReason={hasCv ? undefined : t.chat.cvRequired}
               onTurn={onTurn}
-            />
-          </div>
-          <div className="space-y-4">
-            <ProfileAside
-              kind="employee"
-              userId={userId}
-              card={(me?.card as never) ?? null}
-              pendingQuestions={me?.pendingQuestions ?? []}
-              showFullCard={showFullCard}
-              onFlexibilityChange={(value) => {
-                setMe((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        card: { ...(prev.card as object), flexibility: value },
-                      }
-                    : prev,
-                );
-              }}
-            />
-            <FileImport
-              userId={userId}
-              endpoint="/api/cv"
-              title={t.fileImport.cvTitle}
-              hint={t.fileImport.cvHint}
-              minimalSummary
-              onDone={() => void refresh(userId)}
             />
           </div>
         </div>

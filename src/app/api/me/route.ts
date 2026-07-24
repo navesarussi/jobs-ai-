@@ -1,3 +1,4 @@
+import { employeeHasCv } from "@/domain/candidate-mini-card";
 import { ok, fail } from "@/infrastructure/http";
 import { assertActor } from "@/infrastructure/auth-guard";
 import { hasGeminiKey } from "@/infrastructure/ai/schemas";
@@ -19,11 +20,14 @@ export async function GET(req: Request) {
       const pending = store.fieldQuestions.filter((q) =>
         emp?.pendingFieldQuestionIds.includes(q.id),
       );
+      const cvDocs = emp?.cv?.documents ?? [];
       return ok({
         user,
         card: emp?.card,
         chat: emp?.chat ?? [],
         pendingQuestions: pending,
+        hasCv: employeeHasCv(emp?.cv),
+        cvFileName: cvDocs[cvDocs.length - 1]?.fileName ?? null,
         aiMode: hasGeminiKey() ? "gemini" : "heuristic",
       });
     }
