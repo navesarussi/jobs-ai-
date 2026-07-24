@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+import { Slider } from "@/components/ui/Slider";
 import { candidateMiniCardLines } from "@/domain/candidate-mini-card";
 import { candidateRows, knowledgePercent } from "@/domain/card-progress";
 import { emptyCandidateCard, type CandidateCard } from "@/domain/types";
@@ -44,7 +45,6 @@ function MetricBar(props: {
 function FlexibilityBar(props: {
   userId: string;
   label: string;
-  dragHint: string;
   valueLabel: string;
   value: number;
   onChange: (value: number) => void;
@@ -86,46 +86,30 @@ function FlexibilityBar(props: {
     }
   }
 
-  const percent = Math.round((local / 10) * 100);
-
   return (
     <div
-      className="flex-bar-wrap relative min-w-0 flex-1 rounded-lg border border-[var(--stroke)] bg-[color-mix(in_srgb,var(--chip)_55%,transparent)] px-2 py-1.5 transition duration-150 hover:border-[color-mix(in_srgb,var(--sky)_45%,var(--stroke))] hover:bg-[color-mix(in_srgb,var(--chip)_80%,transparent)]"
+      className="relative min-w-0 flex-1 rounded-lg border border-[var(--stroke)] bg-[color-mix(in_srgb,var(--chip)_55%,transparent)] px-2.5 py-2 transition duration-150 hover:border-[color-mix(in_srgb,var(--sky)_45%,var(--stroke))]"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <div className="mb-1.5 flex items-center justify-between gap-2 text-[10px] text-[var(--muted)]">
-        <span className="flex min-w-0 items-center gap-1.5 truncate">
-          <span className="truncate">{props.label}</span>
-          <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-1.5 py-px text-[9px] font-medium text-[var(--sky)]">
-            <span aria-hidden className="tracking-tighter">
-              ⋮⋮
-            </span>
-            {props.dragHint}
-          </span>
-        </span>
+      <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-[var(--muted)]">
+        <span className="truncate">{props.label}</span>
         <span className="shrink-0 font-semibold text-[var(--ink)]">{props.valueLabel}</span>
       </div>
-      <div className="relative h-5">
-        <div className="flex-bar-track" aria-hidden>
-          <div className="flex-bar-fill" style={{ width: `${percent}%` }} />
-        </div>
-        <input
-          type="range"
-          min={1}
-          max={10}
-          step={1}
-          value={local}
-          aria-label={t.flexibility.title}
-          onChange={(e) => {
-            const next = clampFlex(Number(e.target.value));
-            setLocal(next);
-            props.onChange(next);
-            scheduleSave(next);
-          }}
-          className="flex-bar-slider absolute inset-0 z-10"
-        />
-      </div>
+      <Slider
+        value={local}
+        min={1}
+        max={10}
+        step={1}
+        aria-label={t.flexibility.title}
+        className="py-1.5"
+        onValueChange={(next) => {
+          const clamped = clampFlex(next);
+          setLocal(clamped);
+          props.onChange(clamped);
+          scheduleSave(clamped);
+        }}
+      />
     </div>
   );
 }
@@ -175,7 +159,6 @@ export function CandidateProfileStrip(props: {
           <FlexibilityBar
             userId={props.userId}
             label={t.profile.flexibility}
-            dragHint={t.profile.flexibilityDrag}
             valueLabel={fmtFlex(t.profile.flexibilityValue, flex)}
             value={flex}
             onChange={onFlex}

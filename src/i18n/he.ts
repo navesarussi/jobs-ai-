@@ -170,7 +170,6 @@ export const he: Messages = {
     pendingQuestions: "יש {count} שאלות תחום שמחכות בשיחה",
     emptyValue: "—",
     flexibilityValue: "{value}/10",
-    flexibilityDrag: "גרור",
     miniCardHint: "תצוגה מקוצרת של הפרופיל שלך — לא כל הפרטים הפנימיים.",
     miniCardEmpty: "עדיין אין מספיק פרטים — המשיכו בשיחה אחרי העלאת קורות החיים.",
   },
