@@ -85,7 +85,7 @@ export async function getPool(): Promise<Pool> {
     global.__shidukhPg = new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false },
-      max: 3,
+      max: 5,
       connectionTimeoutMillis: 10000,
     });
   }

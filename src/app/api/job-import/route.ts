@@ -5,9 +5,9 @@ import { getActiveJob, normalizeEmployerRecord, withActiveJob } from "@/domain/e
 import type { StoreData } from "@/domain/types";
 import { runJobDescriptionExtraction } from "@/infrastructure/ai/intake";
 import { assertActor } from "@/infrastructure/auth-guard";
+import { persistEmployerProfile } from "@/infrastructure/db/scoped-store";
 import { extractTextFromUpload, MAX_UPLOAD_BYTES } from "@/infrastructure/files/extract-text";
 import { ok, fail } from "@/infrastructure/http";
-import { writeStore } from "@/infrastructure/store";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -63,7 +63,16 @@ export async function POST(req: Request) {
       };
     }
 
-    await writeStore(next);
+    const nextEmployer = normalizeEmployerRecord(
+      next.employers.find((e) => e.userId === userId)!,
+    );
+    await persistEmployerProfile({
+      store: next,
+      userId,
+      card: nextEmployer.card,
+      jobs: nextEmployer.jobs,
+      activeJobId: nextEmployer.activeJobId,
+    });
     return ok({ ok: true, provider, card: applied.card, jobId: applied.jobId });
   } catch (e) {
     return fail(e);

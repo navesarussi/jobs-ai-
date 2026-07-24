@@ -8,7 +8,11 @@ Architecture: Domain ← Application ← Infrastructure / App.
 - Product chat behavior is defined in `docs/SSOT/CHAT_AGENTS.md` and SRS FR-CHAT-*
 - Chat intake uses `generateObject({ system, messages })` with full recent history; match rebuild is deferred via `after()`
 - Hot paths: single `readStore` via `assertActor`, chat returns card without full page refetch
+- Interactive writes use `scoped-store` (per-user upsert / chat insert / chat clear) — not whole-DB `persistStore`
+- Match rebuild deferred via `after()` on chat + flexibility; in-process store read cache invalidated on writes
 - Admin prompts: live DB override + reset-to-file defaults (`DELETE /api/admin/prompts`)
+- [PENDING REFACTOR]: split `scoped-store.ts` / `application/chat.ts` under 200-line cap
+- [PENDING REFACTOR]: scope `assertActor` reads (per-user slice) instead of full-store load
 
 ## Data layer (Supabase)
 
@@ -24,7 +28,7 @@ Architecture: Domain ← Application ← Infrastructure / App.
 - Employer multi-job: `jobs` jsonb + `matches.job_id`; active job drives chat/candidates
 - Chat persistence: `chat_messages.conversation_context` (`employee`|`employer`) + optional `job_id` — never key chats by `owner_user_id` alone
 - Schema bootstrap: additive `ALTER`s (incl. `conversation_context`) run after `CREATE TABLE IF NOT EXISTS`; context index lives in ALTERS so existing DBs migrate without failing on missing columns
-- [PENDING REFACTOR]: split `SettingsMenu.tsx` / `application/chat.ts` under 200-line cap
+- [PENDING REFACTOR]: split `SettingsMenu.tsx` under 200-line cap
 - [PENDING REFACTOR]: split `domain/cv-merge.ts` under 200-line cap
 - Settings sign-out clears `shidukh_user` + NextAuth session (when present) and returns to `/`
 - [PENDING REFACTOR]: restore employer/admin UI entry points (home role picker, settings default-role, admin menu) after candidate CITOV rebrand phase

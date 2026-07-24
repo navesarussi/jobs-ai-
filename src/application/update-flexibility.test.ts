@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { updateFlexibility } from "./update-flexibility";
+import { applyFlexibility, updateFlexibility } from "./update-flexibility";
 import {
   emptyCandidateCard,
   emptyJobCard,
@@ -40,5 +40,12 @@ describe("updateFlexibility", () => {
   it("clamps out of range values", () => {
     const next = updateFlexibility(seed(), "e1", 99);
     assert.equal(next.employees[0].card.flexibility, 10);
+  });
+
+  it("applyFlexibility skips match rebuild and returns role slice", () => {
+    const applied = applyFlexibility(seed(), "e1", 7);
+    assert.equal(applied.role, "employee");
+    assert.equal(applied.card.flexibility, 7);
+    assert.equal(applied.store.matches.length, 0);
   });
 });

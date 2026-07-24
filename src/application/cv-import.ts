@@ -61,6 +61,7 @@ export async function analyzeCandidateCv(
   provider: string;
   summary: ReturnType<typeof applyCvExtraction>["summary"];
   documentId: string;
+  usageRecord?: ReturnType<typeof createAiUsageRecord>;
 }> {
   const emp = store.employees.find((e) => e.userId === userId);
   if (!emp) throw new NotFoundError("Employee");
@@ -91,19 +92,18 @@ export async function analyzeCandidateCv(
   );
 
   let next: StoreData = applied.store;
+  let usageRecord: ReturnType<typeof createAiUsageRecord> | undefined;
   if (extracted.usage) {
+    usageRecord = createAiUsageRecord({
+      id: randomUUID(),
+      type: "cv_import",
+      promptTokens: extracted.usage.promptTokens,
+      completionTokens: extracted.usage.completionTokens,
+      createdAt: new Date().toISOString(),
+    });
     next = {
       ...next,
-      aiUsage: [
-        ...(next.aiUsage ?? []),
-        createAiUsageRecord({
-          id: randomUUID(),
-          type: "cv_import",
-          promptTokens: extracted.usage.promptTokens,
-          completionTokens: extracted.usage.completionTokens,
-          createdAt: new Date().toISOString(),
-        }),
-      ].slice(-200),
+      aiUsage: [...(next.aiUsage ?? []), usageRecord].slice(-200),
     };
   }
 
@@ -112,5 +112,6 @@ export async function analyzeCandidateCv(
     provider: extracted.provider,
     summary: applied.summary,
     documentId: document.id,
+    usageRecord,
   };
 }

@@ -1,6 +1,6 @@
 import { ok, fail } from "@/infrastructure/http";
 import { assertActor } from "@/infrastructure/auth-guard";
-import { writeStore } from "@/infrastructure/store";
+import { persistEmployerProfile } from "@/infrastructure/db/scoped-store";
 import {
   addEmployerJob,
   normalizeEmployerRecord,
@@ -36,7 +36,13 @@ export async function POST(req: Request) {
         e.userId === body.userId ? employer : e,
       ),
     };
-    await writeStore(next);
+    await persistEmployerProfile({
+      store: next,
+      userId: body.userId,
+      card: employer.card,
+      jobs: employer.jobs,
+      activeJobId: employer.activeJobId,
+    });
 
     return ok({
       jobs: employer.jobs.map((j) => ({

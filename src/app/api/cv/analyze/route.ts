@@ -1,7 +1,7 @@
 import { analyzeCandidateCv } from "@/application/cv-import";
 import { assertActor } from "@/infrastructure/auth-guard";
+import { persistEmployeeProfile } from "@/infrastructure/db/scoped-store";
 import { ok, fail } from "@/infrastructure/http";
-import { writeStore } from "@/infrastructure/store";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,7 +16,15 @@ export async function POST(req: Request) {
     if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 
     const analyzed = await analyzeCandidateCv(gate.store, userId, body.documentId);
-    await writeStore(analyzed.store);
+    const emp = analyzed.store.employees.find((e) => e.userId === userId)!;
+    await persistEmployeeProfile({
+      store: analyzed.store,
+      userId,
+      card: emp.card,
+      pendingFieldQuestionIds: emp.pendingFieldQuestionIds,
+      cv: emp.cv,
+      usageRecord: analyzed.usageRecord,
+    });
 
     return ok({
       ok: true,

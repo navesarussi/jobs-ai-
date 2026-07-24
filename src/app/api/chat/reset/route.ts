@@ -1,7 +1,8 @@
 import { resetChat } from "@/application/chat";
+import { normalizeEmployerRecord } from "@/domain/employer-jobs";
 import { ok, fail } from "@/infrastructure/http";
 import { assertActor } from "@/infrastructure/auth-guard";
-import { writeStore } from "@/infrastructure/store";
+import { clearConversationChat } from "@/infrastructure/db/scoped-store";
 
 export async function POST(req: Request) {
   try {
@@ -17,18 +18,32 @@ export async function POST(req: Request) {
     if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 
     const next = resetChat(gate.store, body.userId, body.role, body.jobId);
-    await writeStore(next);
-
-    const user = next.users.find((u) => u.id === body.userId);
     if (body.role === "employee") {
+      await clearConversationChat({
+        store: next,
+        userId: body.userId,
+        role: "employee",
+      });
       const emp = next.employees.find((e) => e.userId === body.userId);
       return ok({ chat: emp?.chat ?? [], card: emp?.card });
     }
+
     const er = next.employers.find((e) => e.userId === body.userId);
+    const employer = er ? normalizeEmployerRecord(er) : null;
+    await clearConversationChat({
+      store: next,
+      userId: body.userId,
+      role: "employer",
+      jobId: body.jobId ?? employer?.activeJobId,
+      employerCard: employer?.card,
+      employerJobs: employer?.jobs,
+      activeJobId: employer?.activeJobId,
+    });
+    const user = next.users.find((u) => u.id === body.userId);
     return ok({
-      chat: er?.chat ?? [],
-      card: er?.card,
-      jobId: body.jobId ?? er?.activeJobId,
+      chat: employer?.chat ?? [],
+      card: employer?.card,
+      jobId: body.jobId ?? employer?.activeJobId,
       role: user?.role,
     });
   } catch (e) {
