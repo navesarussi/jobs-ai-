@@ -1,8 +1,5 @@
 import { randomUUID } from "crypto";
-import { applyCvExtraction } from "@/application/chat";
-import { createAiUsageRecord } from "@/domain/admin";
-import type { CandidateDocument, StoreData } from "@/domain/types";
-import { runCvExtraction } from "@/infrastructure/ai/intake";
+import { saveCandidateCv } from "@/application/cv-import";
 import { assertActor } from "@/infrastructure/auth-guard";
 import { saveCandidateDocumentBlob } from "@/infrastructure/files/cv-storage";
 import { extractTextFromUpload, MAX_UPLOAD_BYTES } from "@/infrastructure/files/extract-text";
@@ -10,7 +7,7 @@ import { ok, fail } from "@/infrastructure/http";
 import { writeStore } from "@/infrastructure/store";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 30;
 
 export async function POST(req: Request) {
   try {
@@ -34,8 +31,7 @@ export async function POST(req: Request) {
       return ok({ error: "לא נמצא טקסט קריא בקובץ" }, { status: 400 });
     }
 
-    const store = gate.store;
-    const emp = store.employees.find((e) => e.userId === userId);
+    const emp = gate.store.employees.find((e) => e.userId === userId);
     if (!emp) return ok({ error: "משתמש לא נמצא" }, { status: 404 });
 
     const docId = randomUUID();
@@ -45,56 +41,22 @@ export async function POST(req: Request) {
       content: buffer,
     });
 
-    const extracted = await runCvExtraction({ text, card: emp.card });
-    const document: CandidateDocument = {
+    const saved = saveCandidateCv(gate.store, {
+      userId,
       id: docId,
-      kind: "cv",
       fileName: file.name,
       mimeType: file.type || "application/octet-stream",
       byteSize: buffer.length,
       storageKey,
-      uploadedAt: new Date().toISOString(),
-      textCharCount: text.length,
       extractedText: text,
-      extractionStatus: extracted.provider === "heuristic" ? "partial" : "ok",
-    };
+    });
 
-    const applied = applyCvExtraction(
-      store,
-      userId,
-      {
-        patch: extracted.patch,
-        workHistory: extracted.workHistory,
-        educationHistory: extracted.educationHistory,
-        unmappedFacts: extracted.unmappedFacts,
-        fieldConfidence: extracted.fieldConfidence,
-      },
-      document,
-    );
-
-    let next: StoreData = applied.store;
-    if (extracted.usage) {
-      next = {
-        ...next,
-        aiUsage: [
-          ...(next.aiUsage ?? []),
-          createAiUsageRecord({
-            id: randomUUID(),
-            type: "cv_import",
-            promptTokens: extracted.usage.promptTokens,
-            completionTokens: extracted.usage.completionTokens,
-            createdAt: new Date().toISOString(),
-          }),
-        ].slice(-200),
-      };
-    }
-
-    await writeStore(next);
+    await writeStore(saved.store);
     return ok({
       ok: true,
-      provider: extracted.provider,
-      summary: applied.summary,
-      documentId: docId,
+      phase: "saved",
+      documentId: saved.document.id,
+      fileName: saved.document.fileName,
     });
   } catch (e) {
     return fail(e);

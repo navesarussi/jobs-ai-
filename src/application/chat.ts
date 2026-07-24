@@ -39,7 +39,7 @@ function applyCandidatePatch(card: CandidateCard, patch?: CandidatePatch): Candi
     softSkills: patch.softSkills ?? card.softSkills,
     languages: patch.languages ?? card.languages,
     extras: { ...card.extras, ...(patch.extras ?? {}) },
-    flexibility: patch.flexibility ?? card.flexibility,
+    flexibility: card.flexibility,
     experienceYears:
       patch.experienceYears !== undefined ? patch.experienceYears : card.experienceYears,
   };

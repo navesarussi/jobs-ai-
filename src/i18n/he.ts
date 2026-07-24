@@ -142,6 +142,12 @@ export const he: Messages = {
   },
   fileImport: {
     choose: "העלאת קובץ",
+    uploadCv: "העלה קורות חיים",
+    changeCv: "שנה קורות חיים",
+    saving: "שומר…",
+    analyzing: "מנתח…",
+    saved: "קורות החיים נשמרו בהצלחה",
+    analyzed: "הניתוח הושלם — הפרופיל עודכן",
     processing: "קורא…",
     done: "נוסף לכרטיס שלך",
     error: "לא הצלחתי לקרוא את הקובץ",
@@ -312,7 +318,7 @@ export const he: Messages = {
     increase: "הגבר גמישות",
     veryFlexible: "1 · גמיש מאוד",
     exactOnly: "10 · רק מדויק",
-    hint: "אפשר לשנות כאן או לבקש מהסוכן בשיחה — הוא יעדכן לפי ההוראה או לפי מה שהוא מבין.",
+    hint: "גררו את הסרגל או לחצו על הבר כדי לשנות.",
   },
   matching: {
     similarField: "תחום דומה ({candidate} ↔ {job})",

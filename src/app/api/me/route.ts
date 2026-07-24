@@ -21,13 +21,15 @@ export async function GET(req: Request) {
         emp?.pendingFieldQuestionIds.includes(q.id),
       );
       const cvDocs = emp?.cv?.documents ?? [];
+      const latestCv = cvDocs[cvDocs.length - 1];
       return ok({
         user,
         card: emp?.card,
         chat: emp?.chat ?? [],
         pendingQuestions: pending,
         hasCv: employeeHasCv(emp?.cv),
-        cvFileName: cvDocs[cvDocs.length - 1]?.fileName ?? null,
+        cvFileName: latestCv?.fileName ?? null,
+        cvExtractionStatus: latestCv?.extractionStatus ?? null,
         aiMode: hasGeminiKey() ? "gemini" : "heuristic",
       });
     }

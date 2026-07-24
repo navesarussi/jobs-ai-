@@ -140,6 +140,12 @@ export const en = {
   },
   fileImport: {
     choose: "Upload a file",
+    uploadCv: "Upload CV",
+    changeCv: "Change CV",
+    saving: "Saving…",
+    analyzing: "Analyzing…",
+    saved: "CV saved successfully",
+    analyzed: "Analysis complete — profile updated",
     processing: "Reading…",
     done: "Added to your card",
     error: "Could not read the file",
@@ -310,7 +316,7 @@ export const en = {
     increase: "Increase flexibility",
     veryFlexible: "1 · very flexible",
     exactOnly: "10 · exact only",
-    hint: "Change here or ask the agent in chat — it will update from your instruction or what it understands.",
+    hint: "Drag the slider or tap the bar to adjust.",
   },
   matching: {
     similarField: "Similar field ({candidate} ↔ {job})",
