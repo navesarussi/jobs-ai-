@@ -7,7 +7,14 @@ import {
   allowOpenAuth,
   hasGoogleAuth,
 } from "@/infrastructure/auth-flags";
+import { listDevUsers } from "@/application/dev-login";
 import { isAdminEmail } from "@/infrastructure/admin-config";
+import {
+  devSessionIsAdmin,
+  getDevSession,
+  isDevAuthEnabled,
+} from "@/infrastructure/dev-auth";
+import { shouldUseMemoryStore } from "@/infrastructure/db/memory-store";
 import { allowDemo } from "@/infrastructure/auth-guard";
 import {
   findUserByEmailOrGoogle,
@@ -16,13 +23,18 @@ import {
 import { readStore } from "@/infrastructure/store";
 
 export async function GET() {
+  const devSession = await getDevSession();
   const session = await auth();
-  const email = session?.user?.email ?? null;
-  const isAdmin = isAdminEmail(email);
+  const email = devSession?.email ?? session?.user?.email ?? null;
+  const isAdmin = devSessionIsAdmin(devSession) || isAdminEmail(session?.user?.email);
+  const devAuth = isDevAuthEnabled();
   return ok({
     googleAuth: hasGoogleAuth(),
     allowDemo: allowDemoMode(),
     openAuth: allowOpenAuth(),
+    devAuth,
+    memoryStore: shouldUseMemoryStore(),
+    devUsers: devAuth ? listDevUsers() : [],
     isAdmin,
     email,
   });

@@ -10,6 +10,14 @@ import { applyChatRowsToStore, chatRowsFromStore } from "./chat-messages";
 import { ensureSchema, hasNormalizedData } from "./schema";
 import { registerFieldQuestionDefinitions } from "./field-definitions";
 import { getPool } from "./pool";
+import {
+  createSeedStore,
+  findMemoryUserByEmailOrGoogle,
+  readMemoryStore,
+  shouldUseMemoryStore,
+  upsertMemorySessionRole,
+  writeMemoryStore,
+} from "./memory-store";
 
 function normalizeStore(raw: StoreData): StoreData {
   return {
@@ -374,34 +382,14 @@ async function persistStore(client: PoolClient, store: StoreData): Promise<void>
 }
 
 function seedStore(): StoreData {
-  const now = new Date().toISOString();
-  const empId = "demo-employee";
-  const bossId = "demo-employer";
-  return {
-    users: [
-      { id: empId, name: "נועה (דמו עובדת)", role: "employee", createdAt: now },
-      { id: bossId, name: "דני (דמו מעסיק)", role: "employer", createdAt: now },
-    ],
-    employees: [
-      { userId: empId, card: emptyCandidateCard(), chat: [], pendingFieldQuestionIds: [] },
-    ],
-    employers: [
-      normalizeEmployerRecord({
-        userId: bossId,
-        card: emptyJobCard(),
-        chat: [],
-        jobs: [],
-        activeJobId: "",
-      }),
-    ],
-    fieldQuestions: [],
-    fieldAnswers: [],
-    matches: [],
-  };
+  return createSeedStore();
 }
 
 /** Fast path for role start — no full-store rewrite. */
 export async function upsertSessionRole(user: User, role: Role): Promise<User> {
+  if (shouldUseMemoryStore()) {
+    return upsertMemorySessionRole(user, role);
+  }
   await ensureSchema();
   const pool = await getPool();
   const client = await pool.connect();
@@ -453,6 +441,9 @@ export async function findUserByEmailOrGoogle(
   email: string,
   googleId?: string,
 ): Promise<User | null> {
+  if (shouldUseMemoryStore()) {
+    return findMemoryUserByEmailOrGoogle(email, googleId);
+  }
   await ensureSchema();
   const pool = await getPool();
   const result = await pool.query(
@@ -476,6 +467,9 @@ export async function findUserByEmailOrGoogle(
 }
 
 export async function readNormalizedStore(): Promise<StoreData> {
+  if (shouldUseMemoryStore()) {
+    return readMemoryStore();
+  }
   await ensureSchema();
   const pool = await getPool();
 
@@ -503,6 +497,10 @@ export async function readNormalizedStore(): Promise<StoreData> {
 }
 
 export async function writeNormalizedStore(store: StoreData): Promise<void> {
+  if (shouldUseMemoryStore()) {
+    writeMemoryStore(store);
+    return;
+  }
   await ensureSchema();
   const pool = await getPool();
   const client = await pool.connect();
@@ -523,6 +521,11 @@ export async function writeNormalizedStore(store: StoreData): Promise<void> {
 
 /** Replace just the matches table — used by the deferred, off-critical-path refresh. */
 export async function replaceMatches(matches: Match[]): Promise<void> {
+  if (shouldUseMemoryStore()) {
+    const data = readMemoryStore();
+    writeMemoryStore({ ...data, matches });
+    return;
+  }
   await ensureSchema();
   const pool = await getPool();
   const client = await pool.connect();

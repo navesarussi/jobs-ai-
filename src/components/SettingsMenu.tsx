@@ -71,6 +71,7 @@ export function SettingsMenu(props: { variant?: "fixed" | "inline" }) {
   async function handleSignOut() {
     setOpen(false);
     clearSessionOnLogout();
+    await fetch("/api/dev/login", { method: "DELETE" }).catch(() => undefined);
     try {
       await signOut({ redirect: false });
     } catch {
