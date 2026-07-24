@@ -40,8 +40,8 @@ export function RoleLandingPage(props: { role: Role }) {
   const [entering, setEntering] = useState(false);
   const [flags, setFlags] = useState<SessionFlags>({
     googleAuth: false,
-    openAuth: true,
-    devAuth: false,
+    openAuth: false,
+    devAuth: true,
     isAdmin: false,
     devUsers: [],
   });
@@ -54,34 +54,34 @@ export function RoleLandingPage(props: { role: Role }) {
           description: t.home.description,
           enterLabel: t.home.iAmEmployee,
           openHint: t.home.openAuthHint,
-          afterGoogleHint: t.home.afterSignInHint,
+          googleHint: t.home.candidateGoogleHint,
         }
       : {
           description: t.home.employerDescription,
           enterLabel: t.home.iAmEmployer,
           openHint: t.home.employerOpenAuthHint,
-          afterGoogleHint: t.home.employerAfterSignInHint,
+          googleHint: t.home.employerGoogleHint,
         };
 
-  const roleDevUsers = flags.devUsers.filter((u) => u.role === role);
+  async function loadFlags() {
+    const r = await fetch("/api/session");
+    const d = (await r.json()) as Partial<SessionFlags & { devUsers?: DevUser[] }>;
+    setFlags({
+      googleAuth: Boolean(d.googleAuth),
+      openAuth: Boolean(d.openAuth),
+      devAuth: Boolean(d.devAuth),
+      isAdmin: Boolean(d.isAdmin),
+      devUsers: Array.isArray(d.devUsers) ? d.devUsers : [],
+    });
+  }
 
   useEffect(() => {
-    void fetch("/api/session")
-      .then((r) => r.json())
-      .then((d) => {
-        setFlags({
-          googleAuth: Boolean(d.googleAuth),
-          openAuth: Boolean(d.openAuth),
-          devAuth: Boolean(d.devAuth),
-          isAdmin: Boolean(d.isAdmin),
-          devUsers: Array.isArray(d.devUsers) ? d.devUsers : [],
-        });
-      })
+    void loadFlags()
       .catch(() => {
         setFlags({
           googleAuth: false,
-          openAuth: true,
-          devAuth: false,
+          openAuth: false,
+          devAuth: true,
           isAdmin: false,
           devUsers: [],
         });
@@ -90,12 +90,32 @@ export function RoleLandingPage(props: { role: Role }) {
   }, []);
 
   useEffect(() => {
+    if (status !== "authenticated") return;
+    void loadFlags().catch(() => undefined);
+  }, [status]);
+
+  useEffect(() => {
     if (!flagsReady || autoStarted.current) return;
     if (consumeSkipAutoLogin()) return;
 
-    if (flags.isAdmin && !flags.devAuth && status === "authenticated") {
+    const isAuthed = status === "authenticated" && Boolean(session?.user);
+
+    if (isAuthed && flags.googleAuth && flags.isAdmin) {
       autoStarted.current = true;
       router.replace(adminHomePath());
+      return;
+    }
+
+    if (isAuthed && flags.googleAuth && !flags.isAdmin) {
+      autoStarted.current = true;
+      setEntering(true);
+      void startRoleSession(role)
+        .then(() => router.replace(roleHomePath(role)))
+        .catch((e) => {
+          autoStarted.current = false;
+          setError(e instanceof Error ? e.message : t.api.internalError);
+        })
+        .finally(() => setEntering(false));
       return;
     }
 
@@ -104,7 +124,16 @@ export function RoleLandingPage(props: { role: Role }) {
       autoStarted.current = true;
       router.replace(roleHomePath(role));
     }
-  }, [flagsReady, flags.devAuth, flags.isAdmin, role, status, router]);
+  }, [
+    flagsReady,
+    flags.googleAuth,
+    flags.isAdmin,
+    role,
+    session?.user,
+    status,
+    router,
+    t.api.internalError,
+  ]);
 
   async function handleSignOut() {
     clearSessionOnLogout();
@@ -139,11 +168,10 @@ export function RoleLandingPage(props: { role: Role }) {
   }
 
   const isAuthed = status === "authenticated" && Boolean(session?.user);
-  const isAdminUser = flags.isAdmin && !flags.devAuth && isAuthed;
-  const showTestLogin = flags.devAuth;
   const showGoogle = flags.googleAuth && !isAuthed;
-  const showContinue =
-    (flags.openAuth && !flags.googleAuth) || (flags.googleAuth && isAuthed);
+  const showTestLogin = flags.devAuth;
+  const showOpenEnter = flags.openAuth && !flags.googleAuth && !flags.devAuth;
+  const bootstrapping = entering || (isAuthed && flags.googleAuth && !flags.isAdmin);
 
   return (
     <div className="atmosphere">
@@ -168,23 +196,8 @@ export function RoleLandingPage(props: { role: Role }) {
             </p>
           ) : null}
 
-          {isAdminUser ? (
-            <div className="space-y-3">
-              <p className="text-center text-sm text-[var(--muted)]">
-                {fmt(t.home.connectedAs, {
-                  name: session?.user?.name ?? session?.user?.email ?? "",
-                })}
-              </p>
-              <Button
-                onClick={() => router.replace(adminHomePath())}
-                className="cta-glow brand-gradient-bg w-full border-0 py-4 text-base hover:bg-transparent hover:brightness-105"
-              >
-                {t.home.adminPortal}
-              </Button>
-              <Button variant="ghost" onClick={() => void handleSignOut()} className="w-full text-xs">
-                {t.home.signOut}
-              </Button>
-            </div>
+          {bootstrapping ? (
+            <p className="text-center text-sm text-[var(--muted)]">{t.home.openingRole}</p>
           ) : (
             <div className="space-y-3">
               {showGoogle ? (
@@ -197,12 +210,12 @@ export function RoleLandingPage(props: { role: Role }) {
                         prompt: "select_account",
                       })
                     }
-                    className="cta-glow w-full py-4 text-base"
+                    className="cta-glow brand-gradient-bg w-full border-0 py-4 text-base hover:bg-transparent hover:brightness-105"
                   >
                     {t.home.googleSignIn}
                   </Button>
                   <p className="text-center text-xs leading-5 text-[var(--muted)]">
-                    {copy.afterGoogleHint}
+                    {copy.googleHint}
                   </p>
                 </>
               ) : null}
@@ -226,15 +239,13 @@ export function RoleLandingPage(props: { role: Role }) {
                 </>
               ) : null}
 
-              {showContinue ? (
+              {showOpenEnter ? (
                 <>
                   <p className="text-center text-xs leading-5 text-[var(--muted)]">
-                    {flags.googleAuth && isAuthed
-                      ? copy.afterGoogleHint
-                      : copy.openHint}
+                    {copy.openHint}
                   </p>
                   <Button
-                    disabled={entering || (flags.googleAuth && !isAuthed)}
+                    disabled={entering}
                     onClick={() => void enterAsRole()}
                     className="cta-glow brand-gradient-bg w-full border-0 py-4 text-base hover:bg-transparent hover:brightness-105"
                   >
@@ -243,10 +254,19 @@ export function RoleLandingPage(props: { role: Role }) {
                 </>
               ) : null}
 
-              {!showTestLogin && !showGoogle && !showContinue ? (
+              {!showTestLogin && !showGoogle && !showOpenEnter ? (
                 <p className="text-center text-xs leading-5 text-[var(--muted)]">
                   {t.home.googleNotConfigured}
                 </p>
+              ) : null}
+
+              {isAuthed && flags.googleAuth ? (
+                <Button variant="ghost" onClick={() => void handleSignOut()} className="w-full text-xs">
+                  {fmt(t.home.connectedAs, {
+                    name: session?.user?.name ?? session?.user?.email ?? "",
+                  })}{" "}
+                  · {t.home.signOut}
+                </Button>
               ) : null}
             </div>
           )}
@@ -255,7 +275,7 @@ export function RoleLandingPage(props: { role: Role }) {
 
       <DevLoginDialog
         open={loginOpen}
-        users={roleDevUsers}
+        users={flags.devUsers}
         defaultRole={role}
         onClose={() => setLoginOpen(false)}
         onDone={onDevLoginDone}

@@ -7,6 +7,7 @@ import {
 } from "@/infrastructure/dev-auth";
 import { upsertSessionRole } from "@/infrastructure/db/normalized-store";
 import { ok } from "@/infrastructure/http";
+import { readStore } from "@/infrastructure/store";
 
 export async function POST(req: Request) {
   if (!isDevAuthEnabled()) {
@@ -22,15 +23,19 @@ export async function POST(req: Request) {
       deviceId?: string;
     };
 
-    const result = resolveDevLogin({
-      mode: body.mode === "admin" || body.mode === "existing" || body.mode === "new"
-        ? body.mode
-        : "new",
-      role: body.role === "employer" ? "employer" : "employee",
-      userId: body.userId,
-      name: body.name,
-      deviceId: body.deviceId,
-    });
+    const store = await readStore();
+    const result = resolveDevLogin(
+      {
+        mode: body.mode === "admin" || body.mode === "existing" || body.mode === "new"
+          ? body.mode
+          : "new",
+        role: body.role === "employer" ? "employer" : "employee",
+        userId: body.userId,
+        name: body.name,
+        deviceId: body.deviceId,
+      },
+      store.users,
+    );
 
     if (result.kind === "admin") {
       const res = NextResponse.json({

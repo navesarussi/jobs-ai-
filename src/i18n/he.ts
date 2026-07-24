@@ -47,6 +47,8 @@ export const he: Messages = {
     openingRole: "פותחים את המסך שלכם…",
     realUsersTitleOpen: "איך תרצו להמשיך?",
     devSignIn: "כניסה לבדיקות (בלי Google)",
+    candidateGoogleHint: "כניסה למועמדים עם חשבון Google.",
+    employerGoogleHint: "כניסה למעסיקים עם חשבון Google.",
   },
   devLogin: {
     title: "כניסה לסביבת פיתוח",

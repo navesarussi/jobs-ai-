@@ -46,9 +46,11 @@ Without these, “Sign in with Google” fails in production:
 1. Open [Google Cloud Credentials](https://console.cloud.google.com/apis/credentials)
 2. OAuth 2.0 Client (Web) used for this app
 3. **Authorized JavaScript origins**
+   - `https://citov.tech`
    - `https://jobs-ai-snowy.vercel.app`
    - `http://localhost:3000` (local)
 4. **Authorized redirect URIs**
+   - `https://citov.tech/api/auth/callback/google`
    - `https://jobs-ai-snowy.vercel.app/api/auth/callback/google`
    - `http://localhost:3000/api/auth/callback/google`
 5. OAuth consent screen

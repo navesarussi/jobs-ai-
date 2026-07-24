@@ -1,11 +1,13 @@
-/** Soft-disable Google until GOOGLE_AUTH_ENABLED=true (keeps OAuth code intact). */
+/** Soft-disable Google only when explicitly GOOGLE_AUTH_ENABLED=false. */
 export function isGoogleAuthEnabled(): boolean {
+  if (process.env.GOOGLE_AUTH_ENABLED === "false") return false;
+  if (hasGoogleCredentials() && Boolean(process.env.AUTH_SECRET?.trim())) return true;
   return process.env.GOOGLE_AUTH_ENABLED === "true";
 }
 
-/** Production-safe test login (dev dialog) — set ALLOW_TEST_LOGIN=true on Vercel. */
+/** Test login dialog — on by default; set ALLOW_TEST_LOGIN=false to disable. */
 export function isTestLoginEnabled(): boolean {
-  return process.env.ALLOW_TEST_LOGIN === "true";
+  return process.env.ALLOW_TEST_LOGIN !== "false";
 }
 
 export function hasGoogleCredentials(): boolean {
@@ -14,7 +16,7 @@ export function hasGoogleCredentials(): boolean {
   );
 }
 
-/** UI + session: Google button only when explicitly enabled and credentials exist. */
+/** UI + session: Google when enabled and credentials exist. */
 export function hasGoogleAuth(): boolean {
   return isGoogleAuthEnabled() && hasGoogleCredentials();
 }
@@ -23,7 +25,9 @@ export function allowDemoMode(): boolean {
   return process.env.ALLOW_DEMO === "true";
 }
 
-/** Open local sessions for chat development while Google is soft-disabled. */
+/** Open local sessions only in local dev when neither Google nor test login is active. */
 export function allowOpenAuth(): boolean {
-  return !isGoogleAuthEnabled();
+  if (isGoogleAuthEnabled()) return false;
+  if (isTestLoginEnabled()) return false;
+  return process.env.NODE_ENV === "development";
 }

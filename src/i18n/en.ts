@@ -45,6 +45,8 @@ export const en = {
     openingRole: "Opening your screen…",
     realUsersTitleOpen: "Choose how you want to continue",
     devSignIn: "Test sign-in (no Google)",
+    candidateGoogleHint: "Sign in as a candidate with Google.",
+    employerGoogleHint: "Sign in as an employer with Google.",
   },
   devLogin: {
     title: "Development sign-in",

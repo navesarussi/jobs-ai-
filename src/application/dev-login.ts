@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import type { Role, User } from "@/domain/types";
 import { DEV_ADMIN_EMAIL } from "@/infrastructure/dev-auth";
-import { readMemoryStore } from "@/infrastructure/db/memory-store";
+import { createSeedStore } from "@/infrastructure/db/memory-store";
 
 export type DevLoginMode = "admin" | "existing" | "new";
 
@@ -17,8 +17,10 @@ export type DevLoginResult =
   | { kind: "admin"; email: string; redirect: "/admin" }
   | { kind: "user"; user: User; redirect: "/employee" | "/employer" };
 
+const DEMO_USERS = createSeedStore().users;
+
 export function listDevUsers(): { id: string; name: string; role: Role; email?: string }[] {
-  return readMemoryStore().users.map((u) => ({
+  return DEMO_USERS.map((u) => ({
     id: u.id,
     name: u.name,
     role: u.role,
@@ -26,7 +28,7 @@ export function listDevUsers(): { id: string; name: string; role: Role; email?: 
   }));
 }
 
-export function resolveDevLogin(input: DevLoginInput): DevLoginResult {
+export function resolveDevLogin(input: DevLoginInput, knownUsers: User[] = DEMO_USERS): DevLoginResult {
   const role: Role = input.role === "employer" ? "employer" : "employee";
 
   if (input.mode === "admin") {
@@ -36,7 +38,7 @@ export function resolveDevLogin(input: DevLoginInput): DevLoginResult {
   if (input.mode === "existing") {
     const userId = input.userId?.trim();
     if (!userId) throw new Error("חסר מזהה משתמש");
-    const user = readMemoryStore().users.find((u) => u.id === userId);
+    const user = knownUsers.find((u) => u.id === userId) ?? DEMO_USERS.find((u) => u.id === userId);
     if (!user) throw new Error("משתמש לא נמצא");
     return {
       kind: "user",
