@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { InlineInfoHint } from "@/components/InlineInfoHint";
 import { useTranslation } from "@/components/LocaleProvider";
 
 export function FlexibilitySlider(props: {
@@ -48,34 +49,50 @@ export function FlexibilitySlider(props: {
   }
 
   return (
-    <div className="mt-3">
-      <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--muted)]">
-        <span>{t.flexibility.title}</span>
-        <span>
+    <div className="flexibility-control">
+      <div className="flexibility-control__header">
+        <span className="flexibility-control__title-wrap">
+          <span className="flexibility-control__title">{t.flexibility.title}</span>
+          <InlineInfoHint label={t.flexibility.title} tooltipPlacement="top">
+            <span className="inline-info-hint__lines">
+              <span>{t.flexibility.tooltipExact}</span>
+              <span>{t.flexibility.tooltipFlexible}</span>
+            </span>
+          </InlineInfoHint>
+        </span>
+        <span className={`flexibility-control__value${saving ? " is-saving" : ""}`}>
           {local}/10
-          {saving ? "…" : ""}
         </span>
       </div>
-      <input
-        type="range"
-        min={1}
-        max={10}
-        step={1}
-        value={local}
-        aria-label={t.flexibility.title}
-        onChange={(e) => {
-          const next = clamp(Number(e.target.value));
-          setLocal(next);
-          props.onChange(next);
-          scheduleSave(next);
-        }}
-        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[var(--chip)] accent-[var(--accent)]"
-      />
-      <div className="mt-1 flex justify-between text-[10px] leading-4 text-[var(--muted)]">
-        <span>{t.flexibility.veryFlexible}</span>
-        <span>{t.flexibility.exactOnly}</span>
+
+      <div className="flexibility-slider">
+        <div className="flexibility-slider__track" aria-hidden>
+          <div
+            className="flexibility-slider__fill"
+            style={{ ["--flex-pct" as string]: `${(local / 10) * 100}%` }}
+          >
+            <span className="flexibility-slider__marker" />
+          </div>
+        </div>
+        <input
+          type="range"
+          min={1}
+          max={10}
+          step={1}
+          value={local}
+          aria-label={t.flexibility.title}
+          aria-valuemin={1}
+          aria-valuemax={10}
+          aria-valuenow={local}
+          onChange={(e) => {
+            const next = clamp(Number(e.target.value));
+            setLocal(next);
+            props.onChange(next);
+            scheduleSave(next);
+          }}
+          className="flexibility-slider__input"
+        />
       </div>
-      <p className="mt-1 text-[10px] leading-4 text-[var(--muted)]">{t.flexibility.hint}</p>
     </div>
   );
 }

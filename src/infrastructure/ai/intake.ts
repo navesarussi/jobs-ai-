@@ -6,8 +6,9 @@ import {
 } from "./gemini-client";
 import { z } from "zod";
 import type { CandidateCard, ChatMessage, FieldQuestion, JobCard } from "@/domain/types";
-import { heuristicEmployeeIntake, heuristicEmployerIntake } from "./heuristic";
-import { buildEmployeeConversation, buildEmployerConversation } from "./prompts";
+import { normalizeAssistantReplyText } from "@/domain/chat-reply";
+import { heuristicEmployeeIntake, heuristicEmployerIntake, heuristicCvWelcomeReply } from "./heuristic";
+import { buildEmployeeConversation, buildEmployerConversation, cvWelcomeSystemNote } from "./prompts";
 import {
   candidatePatchSchema,
   cvExtractionSchema,
@@ -148,6 +149,9 @@ export async function runEmployerIntake(params: {
 const EXTRACTION_ONLY_NOTE =
   "\n\n(משימה זו: החזר/י אך ורק חילוץ נתונים מובנה לכרטיס מתוך ההודעה האחרונה. אל תנסח/י תשובת שיחה בשדה כלשהו.)";
 
+const REPLY_ONLY_NOTE =
+  "\n\n(בתשובה זו: החזר/י אך ורק טקסט שיחה טבעי בעברית למועמד/ת — בלי JSON, בלי patch, בלי fieldAnswers.)";
+
 /** Stream ONLY the conversational reply (no schema → clean token stream). */
 export function streamEmployeeReply(params: {
   message: string;
@@ -168,7 +172,7 @@ export function streamEmployeeReply(params: {
   const result = streamText({
     model: getGeminiModel(),
     temperature: 0.7,
-    system,
+    system: system + REPLY_ONLY_NOTE,
     messages,
   });
   return { textStream: result.textStream };
@@ -189,10 +193,84 @@ export function streamEmployerReply(params: {
   const result = streamText({
     model: getGeminiModel(),
     temperature: 0.7,
-    system,
+    system: system + REPLY_ONLY_NOTE,
     messages,
   });
   return { textStream: result.textStream };
+}
+
+export async function runCvWelcomeReply(params: {
+  userCvMessage: string;
+  card: CandidateCard;
+  chat: ChatMessage[];
+  pendingQuestions: FieldQuestion[];
+  systemPrompt: string;
+  pendingConflicts?: string;
+  isCvUpdate: boolean;
+  locale: "he" | "en";
+  candidateName?: string;
+}): Promise<{ reply: string; provider: string; usage?: AiTokenUsage; degraded?: boolean }> {
+  const welcomeNote = cvWelcomeSystemNote({
+    isCvUpdate: params.isCvUpdate,
+    locale: params.locale,
+    candidateName: params.candidateName,
+  });
+  const systemPrompt = params.systemPrompt + welcomeNote;
+
+  if (!hasGeminiKey()) {
+    return {
+      reply: heuristicCvWelcomeReply({
+        card: params.card,
+        chat: params.chat,
+        pendingQuestions: params.pendingQuestions,
+        isCvUpdate: params.isCvUpdate,
+        locale: params.locale,
+        candidateName: params.candidateName,
+      }),
+      provider: "heuristic",
+    };
+  }
+
+  try {
+    const { system, messages } = buildEmployeeConversation({
+      template: systemPrompt,
+      message: params.userCvMessage,
+      card: params.card,
+      chat: params.chat,
+      pendingQuestions: params.pendingQuestions,
+      pendingConflicts: params.pendingConflicts,
+    });
+    const { text, usage } = await callGeminiWithRetry(() =>
+      generateText({
+        model: getGeminiModel(),
+        temperature: 0.7,
+        system: system + REPLY_ONLY_NOTE,
+        messages,
+      }),
+    );
+    const reply = normalizeAssistantReplyText(text);
+    if (!reply) throw new Error("empty cv welcome reply");
+    return {
+      reply,
+      provider: "gemini",
+      usage: extractUsage(usage),
+      degraded: false,
+    };
+  } catch (err) {
+    console.error("cv welcome Gemini failed, using heuristic", err);
+    return {
+      reply: heuristicCvWelcomeReply({
+        card: params.card,
+        chat: params.chat,
+        pendingQuestions: params.pendingQuestions,
+        isCvUpdate: params.isCvUpdate,
+        locale: params.locale,
+        candidateName: params.candidateName,
+      }),
+      provider: "heuristic",
+      degraded: true,
+    };
+  }
 }
 
 export async function extractEmployeePatch(params: {

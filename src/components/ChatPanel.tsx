@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { FileImport } from "@/components/FileImport";
 import { useTranslation } from "@/components/LocaleProvider";
 import { Button } from "@/components/ui/Button";
+import { normalizeAssistantReplyText } from "@/domain/chat-reply";
+import { isCvUploadChatContent } from "@/application/cv-upload-chat";
 import type { Locale } from "@/i18n/types";
 
 type Msg = { id: string; role: "user" | "assistant" | "system"; content: string };
@@ -17,6 +20,7 @@ export type ChatTurnPayload = {
   chat?: Msg[];
   pendingQuestions?: { id: string; question: string }[];
   jobId?: string;
+  hasCv?: boolean;
 };
 
 type StreamEvent =
@@ -35,6 +39,8 @@ export function ChatPanel(props: {
   topSlot?: React.ReactNode;
   blockedFooter?: React.ReactNode;
   lockedOverlay?: React.ReactNode;
+  composerAddon?: React.ReactNode;
+  onCvUpdated?: () => void;
   onTurn?: (payload: ChatTurnPayload) => void;
   onReset?: () => void;
 }) {
@@ -149,9 +155,10 @@ export function ChatPanel(props: {
             setProvider(event.provider ?? event.aiMode ?? "");
             setDegraded(Boolean(event.aiDegraded));
             if (event.reply) {
+              const reply = normalizeAssistantReplyText(event.reply);
               setMessages((m) =>
                 m.map((msg) =>
-                  msg.id === assistantId ? { ...msg, content: event.reply! } : msg,
+                  msg.id === assistantId ? { ...msg, content: reply } : msg,
                 ),
               );
             }
@@ -201,7 +208,12 @@ export function ChatPanel(props: {
       if (!data.error) {
         setMessages([]);
         props.onReset?.();
-        props.onTurn?.({ chat: [], card: data.card, jobId: data.jobId });
+        props.onTurn?.({
+          chat: [],
+          card: data.card,
+          jobId: data.jobId,
+          hasCv: data.hasCv as boolean | undefined,
+        });
       }
     } finally {
       setBusy(false);
@@ -210,6 +222,11 @@ export function ChatPanel(props: {
 
   const blocked = Boolean(props.blockedReason);
   const showTyping = busy && !streamingId;
+
+  function displayContent(m: Msg): string {
+    if (m.role !== "assistant") return m.content;
+    return normalizeAssistantReplyText(m.content);
+  }
 
   return (
     <div className="chat-surface flex h-full min-h-0 flex-col">
@@ -260,7 +277,23 @@ export function ChatPanel(props: {
                   : "chat-msg me-6 max-w-[90%] rounded-2xl rounded-ss-sm border border-[var(--stroke)] bg-white px-4 py-3 text-sm leading-6 text-[var(--ink)] shadow-sm"
               }
             >
-              {m.content}
+              <span>{displayContent(m)}</span>
+              {props.role === "employee" &&
+              m.role === "user" &&
+              isCvUploadChatContent(m.content) &&
+              props.onCvUpdated ? (
+                <FileImport
+                  userId={props.userId}
+                  endpoint="/api/cv"
+                  title={t.fileImport.cvTitle}
+                  hint={t.fileImport.cvHint}
+                  variant="message-button"
+                  minimalSummary
+                  cvMode
+                  hasExisting
+                  onDone={props.onCvUpdated}
+                />
+              ) : null}
               {m.id === streamingId && m.content ? (
                 <span className="ms-0.5 inline-block h-3 w-0.5 animate-pulse bg-[var(--accent)] align-middle" />
               ) : null}
@@ -306,6 +339,7 @@ export function ChatPanel(props: {
                 disabled={blocked}
                 className="min-h-12 flex-1 rounded-full border border-[var(--stroke)] bg-[var(--chip)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-60"
               />
+              {props.composerAddon}
               <Button
                 onClick={() => void send()}
                 disabled={busy || blocked}

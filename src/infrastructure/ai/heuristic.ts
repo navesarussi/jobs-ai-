@@ -1,6 +1,7 @@
 import { wasQuestionJustAsked } from "@/domain/chat-context";
 import { nextMissingCandidateField, nextMissingJobField } from "@/domain/card-progress";
 import type { CandidateCard, ChatMessage, FieldQuestion, JobCard } from "@/domain/types";
+import type { Locale } from "@/i18n/types";
 import type { CandidatePatch, IntakeResult, JobPatch } from "./schemas";
 
 function extractList(text: string, label: RegExp): string[] {
@@ -259,4 +260,65 @@ export function heuristicEmployerIntake(
     jobPatch: patch,
     provider: "heuristic",
   };
+}
+
+export function heuristicCvWelcomeReply(params: {
+  card: CandidateCard;
+  chat: ChatMessage[];
+  pendingQuestions: FieldQuestion[];
+  isCvUpdate: boolean;
+  locale: Locale;
+  candidateName?: string;
+}): string {
+  const first = params.candidateName?.split(/[\s(]/)[0]?.trim();
+  const greet = first
+    ? params.locale === "he"
+      ? `שלום ${first}, `
+      : `Hi ${first}, `
+    : params.locale === "he"
+      ? "שלום, "
+      : "Hi, ";
+  const cvLine = params.isCvUpdate
+    ? params.locale === "he"
+      ? "קיבלתי את קורות החיים המעודכנים שלך."
+      : "I received your updated CV."
+    : params.locale === "he"
+      ? "קיבלתי את קורות החיים שלך."
+      : "I received your CV.";
+
+  const role = params.card.desiredRole?.trim();
+  const years = params.card.experienceYears;
+  let highlight = "";
+  if (params.locale === "he") {
+    if (role && years != null) {
+      highlight = ` נראה שיש לך בסביבות ${years} שנות ניסיון ב${role} — זה יתרון משמעותי בשוק.`;
+    } else if (role) {
+      highlight = ` רואה שאת/ה מכוון/ת ל${role} — מעולה.`;
+    } else if (years != null) {
+      highlight = ` יש לך כבר בסביבות ${years} שנות ניסיון — בסיס טוב להמשך.`;
+    }
+  } else if (role && years != null) {
+    highlight = ` It looks like you have about ${years} years of experience in ${role} — a strong advantage.`;
+  } else if (role) {
+    highlight = ` I see you're aiming for ${role} — great.`;
+  } else if (years != null) {
+    highlight = ` You already have about ${years} years of experience — a solid foundation.`;
+  }
+
+  const bridge =
+    params.locale === "he"
+      ? " יש לי כמה שאלות כדי להעלות את סיכויי ההתאמה למשרות — בוא/י נצא לדרך."
+      : " I have a few questions to improve your job matches — let's get started.";
+
+  const missing = nextMissingCandidateField(params.card);
+  const question = pickFollowUp(
+    params.chat,
+    missing?.key,
+    CANDIDATE_FOLLOWUPS,
+    params.locale === "he"
+      ? "ספר/י לי קצת — מה הכי חשוב לך בתפקיד הבא?"
+      : "Tell me — what matters most to you in your next role?",
+  );
+
+  return `${greet}${cvLine}${highlight}${bridge} ${question}`;
 }

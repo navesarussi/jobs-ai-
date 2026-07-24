@@ -3,6 +3,7 @@ import { normalizeEmployerRecord } from "@/domain/employer-jobs";
 import { ok, fail } from "@/infrastructure/http";
 import { assertActor } from "@/infrastructure/auth-guard";
 import { clearConversationChat } from "@/infrastructure/db/scoped-store";
+import { deleteCandidateDocumentBlobs } from "@/infrastructure/files/cv-storage";
 
 export async function POST(req: Request) {
   try {
@@ -17,17 +18,21 @@ export async function POST(req: Request) {
     const gate = await assertActor(body.userId);
     if (!gate.ok) return ok({ error: gate.error }, { status: gate.status });
 
-    const next = resetChat(gate.store, body.userId, body.role, body.jobId);
     if (body.role === "employee") {
+      const before = gate.store.employees.find((e) => e.userId === body.userId);
+      const storageKeys = (before?.cv?.documents ?? []).map((d) => d.storageKey);
+      const next = resetChat(gate.store, body.userId, body.role, body.jobId);
+      await deleteCandidateDocumentBlobs(storageKeys);
       await clearConversationChat({
         store: next,
         userId: body.userId,
         role: "employee",
       });
       const emp = next.employees.find((e) => e.userId === body.userId);
-      return ok({ chat: emp?.chat ?? [], card: emp?.card });
+      return ok({ chat: emp?.chat ?? [], card: emp?.card, hasCv: false });
     }
 
+    const next = resetChat(gate.store, body.userId, body.role, body.jobId);
     const er = next.employers.find((e) => e.userId === body.userId);
     const employer = er ? normalizeEmployerRecord(er) : null;
     await clearConversationChat({

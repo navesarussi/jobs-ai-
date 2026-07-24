@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef } from "react";
 import { CandidateProfileStrip } from "@/components/CandidateProfileStrip";
+import { InlineInfoHint } from "@/components/InlineInfoHint";
 import { ChatPanel, type ChatTurnPayload } from "@/components/ChatPanel";
 import { FileImport } from "@/components/FileImport";
-import { Button } from "@/components/ui/Button";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Locale } from "@/i18n/types";
 import type { CandidateCard } from "@/domain/types";
@@ -13,44 +12,19 @@ import { emptyCandidateCard } from "@/domain/types";
 
 type Msg = { id: string; role: "user" | "assistant" | "system"; content: string };
 
-function FlowSteps(props: { hasCv: boolean; knowledge: number; scheduledInterviews: number }) {
+function ApplicationProgress(props: { percent: number }) {
   const { t } = useTranslation();
-  const chatActive = props.hasCv;
-
-  const steps = [
-    { id: "cv", label: t.employee.stepCv, done: props.hasCv, active: !props.hasCv },
-    { id: "chat", label: t.employee.stepChat, done: props.knowledge > 20, active: chatActive },
-    {
-      id: "interviews",
-      label: t.employee.stepProfile,
-      done: props.scheduledInterviews > 0,
-      active: props.hasCv && props.knowledge > 20,
-    },
-  ];
 
   return (
-    <nav className="employee-flow" aria-label={t.employee.flowTitle}>
-      {steps.map((step, i) => (
-        <div key={step.id} className="employee-flow__item">
-          <span
-            className={`employee-flow__dot ${
-              step.done ? "employee-flow__dot--done" : step.active ? "employee-flow__dot--active" : ""
-            }`}
-            aria-hidden
-          >
-            {step.done ? "✓" : i + 1}
-          </span>
-          <span
-            className={`employee-flow__label ${
-              step.active || step.done ? "employee-flow__label--emphasis" : ""
-            }`}
-          >
-            {step.label}
-          </span>
-          {i < steps.length - 1 ? <span className="employee-flow__line" aria-hidden /> : null}
-        </div>
-      ))}
-    </nav>
+    <div className="employee-application-progress" aria-live="polite">
+      <div className="employee-application-progress__content">
+        <span className="employee-application-progress__value">{props.percent}%</span>
+        <span className="employee-application-progress__label">{t.employee.applicationProgress}</span>
+        <InlineInfoHint label={t.employee.applicationProgressHint}>
+          {t.employee.applicationProgressHint}
+        </InlineInfoHint>
+      </div>
+    </div>
   );
 }
 
@@ -60,64 +34,56 @@ export function EmployeeChatLayout(props: {
   chat: Msg[];
   card: CandidateCard | null | undefined;
   hasCv: boolean;
-  cvFileName?: string | null;
   cvPending: boolean;
-  scheduledInterviews: number;
   placeholder: string;
   onTurn: (payload: ChatTurnPayload) => void;
   onCvDone: () => void;
   onFlexibilityChange: (value: number) => void;
 }) {
   const { t } = useTranslation();
-  const uploadRef = useRef<HTMLInputElement>(null);
   const blockedReason = props.hasCv ? undefined : "blocked";
   const labels = t.cardFields.candidate as Record<string, string>;
   const knowledge = knowledgePercent(
     candidateRows(props.card ?? emptyCandidateCard(), labels),
   );
 
+  const cvUpload = (
+    <FileImport
+      userId={props.userId}
+      endpoint="/api/cv"
+      title={t.fileImport.cvTitle}
+      hint={t.fileImport.cvHint}
+      variant="footer"
+      compact
+      minimalSummary
+      cvMode
+      hasExisting={props.hasCv}
+      pendingAnalysis={props.cvPending}
+      onDone={props.onCvDone}
+    />
+  );
+
+  const cvAttach = (
+    <FileImport
+      userId={props.userId}
+      endpoint="/api/cv"
+      title={t.fileImport.cvTitle}
+      hint={t.fileImport.cvHint}
+      variant="attach"
+      minimalSummary
+      cvMode
+      hasExisting={props.hasCv}
+      onDone={props.onCvDone}
+    />
+  );
+
   return (
     <div className="employee-workspace enter-delay">
-      <FlowSteps
-        hasCv={props.hasCv}
-        knowledge={knowledge}
-        scheduledInterviews={props.scheduledInterviews}
-      />
+      <ApplicationProgress percent={knowledge} />
 
       <div className="employee-workspace__grid">
         <aside className="employee-sidebar">
           <section className="employee-sidebar__section">
-            <header className="employee-sidebar__header">
-              <span className="employee-sidebar__step">1</span>
-              <div>
-                <h2 className="employee-sidebar__title">{t.fileImport.cvTitle}</h2>
-                <p className="employee-sidebar__hint">{t.employee.cvStepHint}</p>
-              </div>
-            </header>
-            <FileImport
-              userId={props.userId}
-              endpoint="/api/cv"
-              title={t.fileImport.cvTitle}
-              hint={t.fileImport.cvHint}
-              variant="sidebar"
-              inputRef={uploadRef}
-              minimalSummary
-              cvMode
-              hasExisting={props.hasCv}
-              existingFileName={props.cvFileName}
-              pendingAnalysis={props.cvPending}
-              onDone={props.onCvDone}
-            />
-          </section>
-
-          <section className="employee-sidebar__section">
-            <header className="employee-sidebar__header">
-              <span className="employee-sidebar__step">2</span>
-              <div>
-                <h2 className="employee-sidebar__title">{t.profile.yourCard}</h2>
-                <p className="employee-sidebar__hint">{t.employee.profileStepHint}</p>
-              </div>
-            </header>
             <CandidateProfileStrip
               card={props.card}
               userId={props.userId}
@@ -127,6 +93,11 @@ export function EmployeeChatLayout(props: {
         </aside>
 
         <section className="employee-chat-main" aria-label={t.chat.title}>
+          {props.cvPending && props.hasCv ? (
+            <div className="hidden" aria-hidden>
+              {cvUpload}
+            </div>
+          ) : null}
           <div className="employee-chat-main__panel">
             <ChatPanel
               key={`${props.userId}-employee`}
@@ -137,6 +108,8 @@ export function EmployeeChatLayout(props: {
               placeholder={props.placeholder}
               blockedReason={blockedReason}
               onTurn={props.onTurn}
+              onCvUpdated={props.onCvDone}
+              composerAddon={props.hasCv && !props.cvPending ? cvAttach : undefined}
               lockedOverlay={
                 props.hasCv ? undefined : (
                   <div className="employee-chat-locked">
@@ -145,12 +118,7 @@ export function EmployeeChatLayout(props: {
                     </div>
                     <h3 className="employee-chat-locked__title">{t.employee.chatLockedTitle}</h3>
                     <p className="employee-chat-locked__body">{t.employee.chatLockedBody}</p>
-                    <Button
-                      onClick={() => uploadRef.current?.click()}
-                      className="cta-glow brand-gradient-bg mt-4 min-h-12 px-8 hover:bg-transparent hover:brightness-105"
-                    >
-                      {t.fileImport.uploadCv}
-                    </Button>
+                    {cvUpload}
                   </div>
                 )
               }

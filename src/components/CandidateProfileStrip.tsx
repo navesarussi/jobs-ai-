@@ -12,7 +12,7 @@ export function CandidateProfileStrip(props: {
   userId: string;
   onFlexibilityChange: (value: number) => void;
 }) {
-  const { t, fmt } = useTranslation();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const card = props.card ?? emptyCandidateCard();
   const labels = t.cardFields.candidate as Record<string, string>;
@@ -25,16 +25,34 @@ export function CandidateProfileStrip(props: {
         type="button"
         className="employee-profile-card__toggle"
         aria-expanded={open}
+        aria-label={open ? t.profile.hideDetails : t.profile.showDetails}
         onClick={() => setOpen((v) => !v)}
       >
         <span className="employee-profile-card__toggle-copy">
-          <span className="employee-profile-card__toggle-title">{t.profile.yourCard}</span>
-          <span className="employee-profile-card__toggle-meta">
-            {fmt(t.profile.knowledgePercent, { percent: String(percent) })} · {t.profile.knowledge}
+          <span className="employee-profile-card__toggle-title">
+            <span className="employee-profile-card__toggle-label">{t.profile.yourCard}</span>
+            <span className="employee-profile-card__toggle-percent">{percent}%</span>
           </span>
+          <span className="employee-profile-card__toggle-meta">{t.employee.profileStepHint}</span>
         </span>
-        <span className="employee-profile-card__chevron" aria-hidden>
-          {open ? "▴" : "▾"}
+        <span className="employee-profile-card__expand">
+          <svg
+            className="employee-profile-card__expand-icon"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden
+          >
+            <path
+              d="M4 6.5L8 10.5L12 6.5"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="employee-profile-card__expand-label">
+            {open ? t.profile.hideDetails : t.profile.showDetails}
+          </span>
         </span>
       </button>
 
@@ -45,7 +63,7 @@ export function CandidateProfileStrip(props: {
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={t.profile.knowledge}
+        aria-label={t.employee.applicationProgress}
       >
         <div className="knowledge-bar__fill" />
       </div>
@@ -72,11 +90,6 @@ export function CandidateProfileStrip(props: {
             value={card.flexibility}
             onChange={props.onFlexibilityChange}
           />
-
-          <p className="employee-profile-card__live">
-            <span className="live-pulse inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-            {t.profile.autoFillHint}
-          </p>
         </>
       ) : null}
     </div>

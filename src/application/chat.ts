@@ -10,11 +10,12 @@ import {
   type CvImportSummary,
   type CvPatchInput,
 } from "@/domain/cv-merge";
-import type {
-  CandidateCard,
-  CandidateDocument,
-  JobCard,
-  StoreData,
+import {
+  emptyCvProfile,
+  type CandidateCard,
+  type CandidateDocument,
+  type JobCard,
+  type StoreData,
 } from "@/domain/types";
 import { runEmployeeIntake, runEmployerIntake } from "@/infrastructure/ai/intake";
 import type { JobPatch } from "@/infrastructure/ai/schemas";
@@ -155,7 +156,7 @@ export function resetChat(
     return {
       ...store,
       employees: store.employees.map((e) =>
-        e.userId === userId ? { ...e, chat: [] } : e,
+        e.userId === userId ? { ...e, chat: [], cv: emptyCvProfile() } : e,
       ),
     };
   }

@@ -24,7 +24,8 @@ export function FileImport(props: {
   hasExisting?: boolean;
   existingFileName?: string | null;
   pendingAnalysis?: boolean;
-  variant?: "default" | "toolbar" | "footer" | "sidebar";
+  compact?: boolean;
+  variant?: "default" | "toolbar" | "footer" | "sidebar" | "attach" | "message-button";
   inputRef?: Ref<HTMLInputElement>;
 }) {
   const { t, fmt, locale } = useTranslation();
@@ -50,14 +51,20 @@ export function FileImport(props: {
     void runAnalysis();
   }, [props.cvMode, props.pendingAnalysis]);
 
-  async function runAnalysis(documentId?: string) {
+  async function runAnalysis(documentId?: string, announceInChat = false, isCvUpdate = false) {
     setStatus("analyzing");
     setPhase(null);
     try {
       const res = await fetch("/api/cv/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: props.userId, documentId, locale }),
+        body: JSON.stringify({
+          userId: props.userId,
+          documentId,
+          locale,
+          announceInChat,
+          isCvUpdate,
+        }),
       });
       const data = await res.json();
       if (res.ok && data.ok) {
@@ -102,8 +109,8 @@ export function FileImport(props: {
 
       if (props.cvMode) {
         setPhase("saved");
-        props.onDone?.();
-        await runAnalysis(data.documentId as string | undefined);
+        const isCvUpdate = Boolean(props.hasExisting);
+        await runAnalysis(data.documentId as string | undefined, true, isCvUpdate);
       } else {
         setStatus("done");
         if (props.minimalSummary && data.summary) {
@@ -292,6 +299,82 @@ export function FileImport(props: {
     );
   }
 
+  if (variant === "message-button") {
+    return (
+      <>
+        <input
+          ref={bindInputRef}
+          type="file"
+          accept=".pdf,.docx,.txt,.md"
+          onChange={(e) => void onFile(e)}
+          className="hidden"
+        />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => localRef.current?.click()}
+          className="mt-2.5 inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-white/35 bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition duration-200 hover:bg-white/25 disabled:cursor-wait disabled:opacity-70"
+        >
+          {busy ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"
+                aria-hidden
+              />
+              {buttonLabel()}
+            </span>
+          ) : (
+            t.chat.attachCv
+          )}
+        </button>
+      </>
+    );
+  }
+
+  if (variant === "attach") {
+    return (
+      <>
+        <input
+          ref={bindInputRef}
+          type="file"
+          accept=".pdf,.docx,.txt,.md"
+          onChange={(e) => void onFile(e)}
+          className="hidden"
+        />
+        <button
+          type="button"
+          disabled={busy}
+          title={t.chat.attachCv}
+          aria-label={t.chat.attachCv}
+          onClick={() => localRef.current?.click()}
+          className="chat-attach-btn inline-flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--stroke)] bg-[var(--chip)] text-[var(--hero)] transition duration-200 hover:border-[var(--accent)] hover:bg-white hover:text-[var(--accent)] disabled:cursor-wait disabled:opacity-60"
+        >
+          {busy ? (
+            <span
+              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+              aria-hidden
+            />
+          ) : (
+            <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M12.5 18.5 7.2 13.2a4.2 4.2 0 0 1 6-5.9l5.6 5.6a3 3 0 0 1-4.2 4.2l-5.1-5.1" />
+              <path d="m16 6 2-2" />
+            </svg>
+          )}
+        </button>
+      </>
+    );
+  }
+
   if (variant === "footer") {
     return (
       <div className="employee-cv-footer">
@@ -302,12 +385,16 @@ export function FileImport(props: {
           onChange={(e) => void onFile(e)}
           className="hidden"
         />
-        <p className="mb-3 text-center text-sm leading-6 text-[var(--warn)]">{t.chat.cvRequired}</p>
+        {!props.compact ? (
+          <p className="mb-3 text-center text-sm leading-6 text-[var(--warn)]">{t.chat.cvRequired}</p>
+        ) : null}
         <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
           {uploadButton}
           {statusLine}
         </div>
-        <p className="mt-2 text-center text-[11px] text-[var(--muted)]">{props.hint}</p>
+        {!props.compact ? (
+          <p className="mt-2 text-center text-[11px] text-[var(--muted)]">{props.hint}</p>
+        ) : null}
       </div>
     );
   }

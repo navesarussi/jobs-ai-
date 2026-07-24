@@ -222,6 +222,49 @@ export function applyEmployeeTurn(params: {
   };
 }
 
+/** Append an assistant reply when the triggering user message is already in chat. */
+export function appendAssistantReply(params: {
+  store: StoreData;
+  userId: string;
+  reply: string;
+  usage?: AiTokenUsage;
+  provider: string;
+  aiDegraded?: boolean;
+}): ChatTurnResult {
+  const { store, userId, reply } = params;
+  const emp = store.employees.find((e) => e.userId === userId);
+  if (!emp) throw new NotFoundError("Employee");
+
+  const assistantMsg = makeMessage("assistant", reply);
+  const usageRecord = buildUsageRecord("employee_intake", params.usage);
+  const next: StoreData = {
+    ...store,
+    aiUsage: usageRecord
+      ? [...(store.aiUsage ?? []), usageRecord].slice(-200)
+      : store.aiUsage,
+    employees: store.employees.map((e) =>
+      e.userId === userId ? { ...e, chat: [...e.chat, assistantMsg] } : e,
+    ),
+  };
+  const empNext = next.employees.find((e) => e.userId === userId)!;
+  const pendingOut = next.fieldQuestions.filter((q) =>
+    empNext.pendingFieldQuestionIds.includes(q.id),
+  );
+  return {
+    store: next,
+    reply,
+    provider: params.provider,
+    aiDegraded: params.aiDegraded,
+    card: empNext.card,
+    chat: empNext.chat,
+    pendingQuestions: pendingOut.map((q) => ({ id: q.id, question: q.question })),
+    newMessages: [assistantMsg],
+    newFieldAnswers: [],
+    usageRecord,
+    cv: empNext.cv,
+  };
+}
+
 export function applyEmployerTurn(params: {
   store: StoreData;
   userId: string;

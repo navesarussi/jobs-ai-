@@ -9,6 +9,7 @@ import type {
   JobSlot,
   StoreData,
 } from "@/domain/types";
+import { emptyCvProfile } from "@/domain/types";
 import type { ChatConversationContext } from "./chat-messages";
 import {
   readMemoryStore,
@@ -231,6 +232,17 @@ export async function persistEmployeeProfile(params: {
   });
 }
 
+/** Insert employee chat rows (memory store is updated via persistEmployeeProfile). */
+export async function insertEmployeeChatMessages(
+  userId: string,
+  messages: ChatMessage[],
+): Promise<void> {
+  if (shouldUseMemoryStore() || messages.length === 0) return;
+  await withTx(async (client) => {
+    await insertChatMessages(client, userId, "employee", null, messages);
+  });
+}
+
 /** Persist employer profile row only (flexibility / job create-select). */
 export async function persistEmployerProfile(params: {
   store: StoreData;
@@ -269,6 +281,16 @@ export async function clearConversationChat(params: {
          where owner_user_id = $1 and conversation_context = 'employee'`,
         [params.userId],
       );
+      const emp = params.store.employees.find((e) => e.userId === params.userId);
+      if (emp) {
+        await upsertEmployeeProfile(
+          client,
+          params.userId,
+          emp.card,
+          emp.pendingFieldQuestionIds,
+          emptyCvProfile(),
+        );
+      }
       return;
     }
     const jobId = params.jobId ?? params.activeJobId ?? null;

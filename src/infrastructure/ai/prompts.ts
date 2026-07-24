@@ -104,6 +104,22 @@ function renderSystem(template: string, vars: Record<string, string>): string {
   });
 }
 
+export function cvWelcomeSystemNote(params: {
+  isCvUpdate: boolean;
+  locale: "he" | "en";
+  candidateName?: string;
+}): string {
+  const name = params.candidateName?.trim();
+  if (params.locale === "en") {
+    return params.isCvUpdate
+      ? `\n\n[System: The candidate uploaded an updated CV. Open with "I received your updated CV", greet by name if known${name ? ` (${name})` : ""}, mention one strength from the card (role/experience), note you have a few questions to improve job matches, and end with one natural first question per your strategy. Warm, short, positive.]`
+      : `\n\n[System: The candidate uploaded a CV for the first time. Greet by name if known${name ? ` (${name})` : ""}, say you received their CV, mention one strength from the profile, note you have a few questions to improve matches, and end with one natural first question. Warm, short, positive.]`;
+  }
+  return params.isCvUpdate
+    ? `\n\n[אירוע מערכת: המועמד/ת העלה/תה קורות חיים מעודכנים. פתח/י במשפט שמתחיל ב"קיבלתי את קורות החיים המעודכנים שלך", פנה/י בשם${name ? ` (${name})` : ""} אם ידוע, אזכור/י נקודת חוזק אחת מהכרטיס (תפקיד/ניסיון), ציין/י שיש כמה שאלות להעלאת סיכויי ההתאמה, וסיים/י בשאלה ראשונה טבעית לפי האסטרטגיה. טון חיובי, קצר, "קיבלתי — בוא/י נצא לדרך".]`
+    : `\n\n[אירוע מערכת: המועמד/ת העלה/תה קורות חיים לראשונה. פתח/י בברכה אישית${name ? ` (${name})` : ""}, אמור/י "קיבלתי את קורות החיים שלך", אזכור/י נקודת חוזק מהפרופיל, ציין/י שיש כמה שאלות להעלאת סיכויי ההתאמה, וסיים/י בשאלה ראשונה טבעית. טון חיובי וקצר.]`;
+}
+
 export function buildEmployeeConversation(params: {
   template: string;
   message: string;

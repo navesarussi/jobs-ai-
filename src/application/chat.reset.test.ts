@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { resetChat } from "./chat";
 import { normalizeEmployerRecord } from "@/domain/employer-jobs";
-import { emptyCandidateCard, emptyJobCard, type StoreData } from "@/domain/types";
+import { emptyCandidateCard, emptyCvProfile, emptyJobCard, type StoreData } from "@/domain/types";
 
 describe("resetChat", () => {
-  it("clears employee chat only", () => {
+  it("clears employee chat and uploaded CV", () => {
     const store: StoreData = {
       users: [],
       employees: [
@@ -14,6 +14,23 @@ describe("resetChat", () => {
           card: emptyCandidateCard(),
           chat: [{ id: "1", role: "user", content: "a", createdAt: "t" }],
           pendingFieldQuestionIds: [],
+          cv: {
+            ...emptyCvProfile(),
+            documents: [
+              {
+                id: "d1",
+                kind: "cv",
+                fileName: "cv.pdf",
+                mimeType: "application/pdf",
+                byteSize: 10,
+                storageKey: "mem:d1",
+                uploadedAt: "t",
+                textCharCount: 20,
+                extractedText: "hello world from cv",
+                extractionStatus: "ok",
+              },
+            ],
+          },
         },
       ],
       employers: [],
@@ -23,6 +40,7 @@ describe("resetChat", () => {
     };
     const next = resetChat(store, "u1", "employee");
     assert.equal(next.employees[0]!.chat.length, 0);
+    assert.equal(next.employees[0]!.cv?.documents.length, 0);
   });
 
   it("clears only the active employer job chat", () => {

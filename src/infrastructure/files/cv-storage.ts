@@ -49,3 +49,14 @@ export async function readCandidateDocumentBlob(storageKey: string): Promise<Buf
 export function clearMemoryDocumentBlobs(): void {
   memoryBlobs.clear();
 }
+
+export async function deleteCandidateDocumentBlobs(storageKeys: string[]): Promise<void> {
+  for (const key of storageKeys) {
+    if (key.startsWith("mem:")) memoryBlobs.delete(key);
+  }
+  const ids = storageKeys.filter((k) => k.startsWith("pg:")).map((k) => k.slice(3));
+  if (ids.length === 0 || shouldUseMemoryStore()) return;
+  await ensureSchema();
+  const pool = await getPool();
+  await pool.query(`delete from candidate_document_blobs where id = any($1::text[])`, [ids]);
+}

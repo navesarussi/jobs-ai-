@@ -27,6 +27,7 @@ import {
   heuristicEmployeeIntake,
   heuristicEmployerIntake,
 } from "@/infrastructure/ai/heuristic";
+import { normalizeAssistantReplyText } from "@/domain/chat-reply";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -215,7 +216,6 @@ async function runEmployeeStream(
     for await (const delta of textStream) {
       if (!delta) continue;
       replyText += delta;
-      frame(controller, { type: "delta", text: delta });
     }
   } catch (err) {
     console.error("gemini employee reply stream failed", err);
@@ -229,6 +229,9 @@ async function runEmployeeStream(
     const h = heuristicEmployeeIntake(message, prep.card, prep.pendingQuestions, prep.chat);
     replyText = h.reply;
     await emitTyping(controller, h.reply);
+  } else {
+    replyText = normalizeAssistantReplyText(replyText);
+    await emitTyping(controller, replyText);
   }
 
   return applyEmployeeTurn({
@@ -287,7 +290,6 @@ async function runEmployerStream(
     for await (const delta of textStream) {
       if (!delta) continue;
       replyText += delta;
-      frame(controller, { type: "delta", text: delta });
     }
   } catch (err) {
     console.error("gemini employer reply stream failed", err);
@@ -301,6 +303,9 @@ async function runEmployerStream(
     const h = heuristicEmployerIntake(message, prep.card, prep.chat);
     replyText = h.reply;
     await emitTyping(controller, h.reply);
+  } else {
+    replyText = normalizeAssistantReplyText(replyText);
+    await emitTyping(controller, replyText);
   }
 
   return applyEmployerTurn({

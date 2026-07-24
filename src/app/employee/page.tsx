@@ -65,11 +65,15 @@ export default function EmployeePage() {
             card: payload.card ?? prev.card,
             chat: (payload.chat as typeof prev.chat) ?? prev.chat,
             pendingQuestions: payload.pendingQuestions ?? prev.pendingQuestions,
+            hasCv: payload.hasCv ?? prev.hasCv,
+            cvFileName: payload.hasCv === false ? null : prev.cvFileName,
+            cvExtractionStatus: payload.hasCv === false ? null : prev.cvExtractionStatus,
           }
         : {
             card: payload.card,
             chat: (payload.chat as never) ?? [],
             pendingQuestions: payload.pendingQuestions ?? [],
+            hasCv: payload.hasCv,
           },
     );
     if (userId) void refreshLists(userId);
@@ -108,6 +112,8 @@ export default function EmployeePage() {
           <SegmentedTabs
             value={tab}
             onChange={(id) => setTab(id as Tab)}
+            fullWidth
+            variant="workspace"
             tabs={[
               { id: "chat", label: t.employee.chatTab },
               { id: "jobs", label: fmt(t.employee.jobsTab, { count: jobs.length }) },
@@ -130,9 +136,7 @@ export default function EmployeePage() {
           chat={me?.chat ?? []}
           card={(me?.card as CandidateCard | null) ?? null}
           hasCv={hasCv}
-          cvFileName={me?.cvFileName}
           cvPending={me?.cvExtractionStatus === "pending"}
-          scheduledInterviews={jobs.length}
           placeholder={t.employee.chatPlaceholder}
           onTurn={onTurn}
           onCvDone={() => void refresh(userId)}
